@@ -15,8 +15,7 @@
     "initializeCommand": [
     "export DEBIAN_FRONTEND=noninteractive && sudo apt-get update && sudo apt-get upgrade -y -o Dpkg::Options::='--force-confold'"
 ],
-    "postCreateCommand": ["export DEBIAN_FRONTEND=noninteractive && sudo apt-get update && sudo apt-get upgrade -y -o Dpkg::Options::='--force-confold'"
-    ],
+    "postCreateCommand": [],
     "portsAttributes": {
         "2159": {
             "label": "gdb"
