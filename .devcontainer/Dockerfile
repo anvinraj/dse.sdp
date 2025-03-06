@@ -30,6 +30,8 @@ RUN set -eux; \
     apt-get clean; \
     rm -rf /var/lib/apt/lists/*;
 
+RUN npm install -g typescript
+
 COPY .devcontainer/.bash_aliases /home/codespace/.bash_aliases
 COPY --from=go /usr/local/bin/testscript /usr/local/bin/testscript
 COPY --from=go /usr/local/bin/task /usr/local/bin/task
