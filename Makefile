@@ -6,7 +6,7 @@ export DSE_MODELC_VERSION ?= 2.1.14
 export DSE_MODELC_URL ?= https://github.com/boschglobal/dse.modelc/releases/download/v$(DSE_MODELC_VERSION)/ModelC-$(DSE_MODELC_VERSION)-linux-amd64.zip
 
 
-SUBDIRS = dsl lsp ast graph 
+SUBDIRS = dsl ast graph lsp
 
 
 default: build
@@ -22,13 +22,10 @@ examples: downloads
 	mkdir -p out/examples
 	test -d out/examples/modelc || ( cp -R build/downloads/ModelC-$(DSE_MODELC_VERSION)-linux-amd64/examples out/examples/modelc )
 
-SUBDIRS_SORTED := $(filter-out lsp, $(SUBDIRS)) lsp
 
 .PHONY: build
 build:
-	@for d in $(SUBDIRS_SORTED); do \
-		($(MAKE) -C $$d build ); \
-	done
+	@for d in $(SUBDIRS); do ($(MAKE) -C $$d build ); done
 
 
 .PHONY: test
@@ -38,10 +35,7 @@ test:
 
 .PHONY: install
 install:
-	@for d in $(SUBDIRS_SORTED); do \
-		echo "Processing: $$d"; \
-		($(MAKE) -C $$d install); \
-	done
+	@for d in $(SUBDIRS); do ($(MAKE) -C $$d install ); done
 
 
 .PHONY: clean
