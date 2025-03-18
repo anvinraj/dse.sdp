@@ -36,9 +36,11 @@ test:
 .PHONY: install
 install:
 	@for d in $(SUBDIRS); do \
-		echo "Processing: $$d"; \
-		($(MAKE) -C $$d install); \
+		if [ "$$d" != "lsp" ]; then \
+			($(MAKE) -C $$d install); \
+		fi \
 	done
+	$(MAKE) -C lsp install
 
 
 .PHONY: clean
