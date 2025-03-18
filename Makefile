@@ -33,16 +33,14 @@ test:
 	@for d in $(SUBDIRS); do ($(MAKE) -C $$d test ); done
 
 
+SUBDIRS_SORTED := $(filter-out lsp, $(SUBDIRS)) lsp
+
 .PHONY: install
 install:
-	@for d in $(SUBDIRS); do \
-		if [ "$$d" != "lsp" ]; then \
-			echo "========================> Processing: $$d"; \
-			($(MAKE) -C $$d install); \
-		fi \
+	@for d in $(SUBDIRS_SORTED); do \
+		echo "Processing: $$d"; \
+		($(MAKE) -C $$d install); \
 	done
-	echo "========================> Processing: lsp"
-	$(MAKE) -C lsp install
 
 
 .PHONY: clean
