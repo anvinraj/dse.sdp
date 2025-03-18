@@ -13,7 +13,7 @@ build:
 
 .PHONY: install
 install: build
-#	code --install-extension out .vsix
+	code --install-extension ./out/fsil-1.0.0.vsix
 
 .PHONY: clean
 clean:
