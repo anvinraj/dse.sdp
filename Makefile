@@ -35,7 +35,8 @@ test:
 
 .PHONY: install
 install:
-	@for d in $(filter-out lsp, $(SUBDIRS)) lsp; do \
+	@for d in $(SUBDIRS); do \
+		echo "Processing: $$d"; \
 		($(MAKE) -C $$d install); \
 	done
 
