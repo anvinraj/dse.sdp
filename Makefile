@@ -41,7 +41,7 @@ install:
 			($(MAKE) -C $$d install); \
 		fi \
 	done
-	echo "========================> Processing: lsp"; \
+	echo "========================> Processing: lsp"
 	$(MAKE) -C lsp install
 
 
