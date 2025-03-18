@@ -16,8 +16,7 @@
         "lib": "./lib"
     },
     "dependencies": {
-        "chevrotain": "^11.0.3",
-        "esbuild": "^0.25.1"
+        "chevrotain": "^11.0.3"
     },
     "devDependencies": {
         "@types/node": "^22.10.1",
