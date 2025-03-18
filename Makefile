@@ -37,9 +37,11 @@ test:
 install:
 	@for d in $(SUBDIRS); do \
 		if [ "$$d" != "lsp" ]; then \
+			echo "========================> Processing: $$d"; \
 			($(MAKE) -C $$d install); \
 		fi \
 	done
+	echo "========================> Processing: lsp"; \
 	$(MAKE) -C lsp install
 
 
