@@ -17,7 +17,7 @@
     ],
     "postCreateCommand": {
         "SDP build": "make",
-        "SDP install": "make install VERBOSE=1"
+        "SDP install": "make install"
     },
     "portsAttributes": {
         "2159": {
