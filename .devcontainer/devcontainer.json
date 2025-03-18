@@ -16,8 +16,8 @@
     "onCreateCommand": [
     ],
     "postCreateCommand": {
-        "SDP build": "make",
-        "SDP install": "make install  SHELL='/bin/bash -x'"
+    "SDP build": "make 2>&1 | tee /tmp/make_build.log",
+    "SDP install": "make install SHELL='/bin/bash -x' 2>&1 | tee /tmp/make_install.log"
     },
     "portsAttributes": {
         "2159": {
