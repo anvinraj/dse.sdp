@@ -17,7 +17,7 @@
     ],
     "postCreateCommand": {
         "SDP build": "make",
-        "SDP install": "make install --debug"
+        "SDP install": "make install  SHELL='/bin/bash -x'"
     },
     "portsAttributes": {
         "2159": {
