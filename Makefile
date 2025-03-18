@@ -22,18 +22,19 @@ examples: downloads
 	mkdir -p out/examples
 	test -d out/examples/modelc || ( cp -R build/downloads/ModelC-$(DSE_MODELC_VERSION)-linux-amd64/examples out/examples/modelc )
 
+SUBDIRS_SORTED := $(filter-out lsp, $(SUBDIRS)) lsp
 
 .PHONY: build
 build:
-	@for d in $(SUBDIRS); do ($(MAKE) -C $$d build ); done
+	@for d in $(SUBDIRS_SORTED); do \
+		($(MAKE) -C $$d build ); \
+	done
 
 
 .PHONY: test
 test:
 	@for d in $(SUBDIRS); do ($(MAKE) -C $$d test ); done
 
-
-SUBDIRS_SORTED := $(filter-out lsp, $(SUBDIRS)) lsp
 
 .PHONY: install
 install:
