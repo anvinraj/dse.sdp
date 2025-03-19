@@ -13,8 +13,10 @@ build:
 
 .PHONY: install
 install: build
-	unzip ./out/bin/dse.vsix -d /home/codespace/.vscode-remote/extensions/dse.dse-1.0.0
-	code --reload-window
+	unzip -q ./out/bin/dse.vsix "extension/*" -d /home/codespace/.vscode-remote/extensions/temp
+	mkdir /home/codespace/.vscode-remote/extensions/dse.fsil-1.0.0
+	mv /home/codespace/.vscode-remote/extensions/temp/extension/* /home/codespace/.vscode-remote/extensions/dse.fsil-1.0.0/
+	rm -rf /home/codespace/.vscode-remote/extensions/temp
 
 .PHONY: clean
 clean:
