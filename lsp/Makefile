@@ -1,16 +1,18 @@
 # Copyright 2024 Robert Bosch GmbH
 #
 # SPDX-License-Identifier: Apache-2.0
+
 default: build
 
 .PHONY: build
 build:
 	mkdir -p out/bin
 	mkdir -p bin/graph/yaml
+	npm install -g typescript
 	npm install
 	vsce package --out ./out/bin/dse.vsix
 
-EXTENSION_NAME := dse.fsil-1.0.0
+EXTENSION_NAME := dse.dse-1.0.0
 .PHONY: install
 install: build
 	mkdir -p /home/codespace/.vscode-remote/extensions/temp
@@ -19,7 +21,6 @@ install: build
 	mv /home/codespace/.vscode-remote/extensions/temp/extension/* /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME)/
 	rm -rf /home/codespace/.vscode-remote/extensions/temp
 	@exit 0
-
 
 .PHONY: clean
 clean:
