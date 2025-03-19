@@ -13,6 +13,9 @@ build:
 
 .PHONY: install
 install: build
+	code --install-extension ./out/bin/dse.vsix
+	code --enable-proposed-api dse.dse
+	
 
 .PHONY: clean
 clean:
