@@ -4,7 +4,8 @@
         "context": ".."
     },
     "extensions": [
-        "streetsidesoftware.code-spell-checker"
+        "streetsidesoftware.code-spell-checker",
+        "./lsp/out/bin/dse.vsix"
     ],
     "features": {
     },
