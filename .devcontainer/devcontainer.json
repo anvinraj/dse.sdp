@@ -17,8 +17,7 @@
     ],
     "postCreateCommand": {
      "SDP build": "make 2>&1 | tee /tmp/make_build.log",
-     "SDP install": "make install SHELL='/bin/bash -x' 2>&1 | tee /tmp/make_install.log",
-     "EXTENSION install": "while [ ! -f ./lsp/out/bin/dse.vsix ]; do sleep 2; done && code --install-extension ./lsp/out/bin/dse.vsix --force"
+     "SDP install": "make install SHELL='/bin/bash -x' 2>&1 | tee /tmp/make_install.log"
      },
     "portsAttributes": {
         "2159": {
