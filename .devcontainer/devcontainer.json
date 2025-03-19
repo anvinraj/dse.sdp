@@ -15,7 +15,10 @@
     },
     "onCreateCommand": [
     ],
-    "postCreateCommand": "make 2>&1 | tee /tmp/make_build.log && make install SHELL='/bin/bash -x' 2>&1 | tee /tmp/make_install.log && code --install-extension ./lsp/out/bin/dse.vsix",
+    "postCreateCommand": {
+     "SDP build": "make 2>&1 | tee /tmp/make_build.log",
+     "SDP install": "make install SHELL='/bin/bash -x' 2>&1 | tee /tmp/make_install.log && code --install-extension ./lsp/out/bin/dse.vsix"
+     },
     "portsAttributes": {
         "2159": {
             "label": "gdb"
