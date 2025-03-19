@@ -8,7 +8,7 @@ default: build
 build:
 	mkdir -p out/bin
 	mkdir -p bin/graph/yaml
-	npm install && npm install -g vsce --force && npm install -g http-server
+	npm install && npm install -g vsce --force && npm install -g http-server --force
 	vsce package --out ./out/bin
 
 .PHONY: install
