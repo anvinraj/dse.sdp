@@ -5,7 +5,8 @@
 default: install
 
 .PHONY: install
-install: npm install
+install:
+	npm install
 
 
 .PHONY: clean
