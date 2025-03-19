@@ -1,8 +1,6 @@
 # Copyright 2024 Robert Bosch GmbH
 #
 # SPDX-License-Identifier: Apache-2.0
-SHELL := /bin/bash
-
 default: build
 
 .PHONY: build
@@ -14,10 +12,12 @@ build:
 
 .PHONY: install
 install: build
+	mkdir -p /home/codespace/.vscode-remote/extensions/temp
 	unzip -q ./out/bin/dse.vsix "extension/*" -d /home/codespace/.vscode-remote/extensions/temp
-	mkdir /home/codespace/.vscode-remote/extensions/dse.fsil-1.0.0
+	mkdir -p /home/codespace/.vscode-remote/extensions/dse.fsil-1.0.0
 	mv /home/codespace/.vscode-remote/extensions/temp/extension/* /home/codespace/.vscode-remote/extensions/dse.fsil-1.0.0/
 	rm -rf /home/codespace/.vscode-remote/extensions/temp
+
 
 .PHONY: clean
 clean:
