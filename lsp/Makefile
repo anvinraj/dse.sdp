@@ -8,7 +8,6 @@ default: build
 build:
 	mkdir -p out/bin
 	mkdir -p bin/graph/yaml
-	npm install -g typescript
 	npm install
 	vsce package --out ./out/bin/dse.vsix
 
