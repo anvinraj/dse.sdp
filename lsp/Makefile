@@ -13,7 +13,7 @@ build:
 
 .PHONY: install
 install: build
-	code --install-extension $(realpath ./out/bin/dse.vsix) --force	
+	code --install-extension $(realpath ./out/bin/dse.vsix) --force	--user-data-dir ~/.vscode
 
 .PHONY: clean
 clean:
