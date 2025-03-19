@@ -335,7 +335,7 @@ connection.onDidChangeConfiguration(change => {
 		documentSettings.clear();
 	} else {
 		globalSettings = <ExampleSettings>(
-			(change.settings.fsil || defaultSettings)
+			(change.settings.dse || defaultSettings)
 		);
 	}
 	connection.languages.diagnostics.refresh();
@@ -349,7 +349,7 @@ function getDocumentSettings(resource: string): Thenable<ExampleSettings> {
 	if (!result) {
 		result = connection.workspace.getConfiguration({
 			scopeUri: resource,
-			section: 'fsil'
+			section: 'dse'
 		});
 		documentSettings.set(resource, result);
 	}
