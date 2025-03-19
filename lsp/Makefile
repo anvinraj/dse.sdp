@@ -9,11 +9,11 @@ build:
 	mkdir -p out/bin
 	mkdir -p bin/graph/yaml
 	npm install
-	vsce package --out ./out/bin
+	vsce package --out ./out/bin/dse.vsix
 
 .PHONY: install
 install: build
-	code --install-extension ./out/bin/fsil-1.0.0.vsix
+	code --install-extension ./out/bin/dse.vsix
 
 .PHONY: clean
 clean:
