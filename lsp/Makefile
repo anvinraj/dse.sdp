@@ -14,6 +14,7 @@ build:
 .PHONY: install
 install: build
 	unzip ./out/bin/dse.vsix -d /home/codespace/.vscode-remote/extensions/dse.dse-1.0.0
+	code --reload-window
 
 .PHONY: clean
 clean:
