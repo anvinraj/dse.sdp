@@ -13,7 +13,9 @@
         "url": ""
     },
     "dependencies": {
-        "vscode-languageclient": "^9.0.1"
+        "vscode": "^1.76.0",
+        "vscode-languageclient": "^9.0.1",
+        "@types/vscode": "^1.75.1"
     },
     "devDependencies": {
         "@types/vscode": "^1.75.1",
