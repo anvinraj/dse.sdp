@@ -13,7 +13,7 @@ build:
 
 .PHONY: install
 install: build
-	code-server --install-extension ./out/bin/dse.vsix
+	code --install-extension ./out/bin/dse.vsix
 
 .PHONY: clean
 clean:
