@@ -127,7 +127,7 @@
         "compile": "tsc -b",
         "watch": "tsc -b -w",
         "lint": "eslint ./client/src ./server/src --ext .ts,.tsx",
-        "postinstall": "cd client && npm install --force && cd ../server && npm install --force && cd ../ast_dag && npm install --force && cd .."
+        "postinstall": ""
     },
     "devDependencies": {
         "@types/js-yaml": "^4.0.9",
