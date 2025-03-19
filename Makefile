@@ -41,7 +41,7 @@ install:
 			for sub in $(LSPDIRS); do \
 				$(MAKE) -C lsp/$$sub install; \
 			done; \
-			$(MAKE) -C $$d install; \
+			$(MAKE) -C lsp install; \
 		else \
 			$(MAKE) -C $$d install; \
 		fi \
