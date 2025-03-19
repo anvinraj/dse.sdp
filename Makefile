@@ -6,9 +6,7 @@ export DSE_MODELC_VERSION ?= 2.1.14
 export DSE_MODELC_URL ?= https://github.com/boschglobal/dse.modelc/releases/download/v$(DSE_MODELC_VERSION)/ModelC-$(DSE_MODELC_VERSION)-linux-amd64.zip
 
 
-SUBDIRS = dsl ast graph lsp 
-LSPDIRS = client server ast_dag 
-
+SUBDIRS = dsl ast graph lsp lsp/client lsp/server lsp/ast_dag
 
 default: build
 
@@ -36,16 +34,7 @@ test:
 
 .PHONY: install
 install:
-	@for d in $(SUBDIRS); do \
-		if [ "$$d" = "lsp" ]; then \
-			for sub in $(LSPDIRS); do \
-				$(MAKE) -C lsp/$$sub install; \
-			done; \
-			$(MAKE) -C lsp install; \
-		else \
-			$(MAKE) -C $$d install; \
-		fi \
-	done
+	@for d in $(SUBDIRS); do ($(MAKE) -C $$d install ); done
 
 
 .PHONY: clean
