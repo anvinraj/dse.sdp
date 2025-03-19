@@ -36,7 +36,7 @@ RUN curl gpg software-properties-common | curl -fsSL https://packages.microsoft.
 	
 RUN apt-get update && apt-get install -y code
 
-RUN npm install -g typescript
+RUN npm install -g typescript @vscode/vsce http-server vscode-languageclient
 
 COPY .devcontainer/.bash_aliases /home/codespace/.bash_aliases
 COPY --from=go /usr/local/bin/testscript /usr/local/bin/testscript
