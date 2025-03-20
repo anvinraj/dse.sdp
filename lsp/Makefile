@@ -20,7 +20,7 @@ install: build
 	rm -rf /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME)
 	rm -rf /home/codespace/.vscode-remote/extensions/temp
 	mkdir -p /home/codespace/.vscode-remote/extensions/temp
-	unzip -o -qq ./out/bin/dse.vsix "extension/*" -d /home/codespace/.vscode-remote/extensions/temp
+	unzip -q ./out/bin/dse.vsix "extension/*" -d /home/codespace/.vscode-remote/extensions/temp
 	mkdir -p /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME)
 	mv /home/codespace/.vscode-remote/extensions/temp/extension/* /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME)/
 	rm -rf /home/codespace/.vscode-remote/extensions/temp
