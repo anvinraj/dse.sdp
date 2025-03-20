@@ -128,7 +128,7 @@
         "compile": "tsc -b",
         "watch": "tsc -b -w",
         "lint": "eslint ./client/src ./server/src --ext .ts,.tsx",
-        "postinstall": "cd client && npm install && cd ../server && npm install  && cd ../ast_dag && npm install && cd .."
+        "postinstall": "cd client && npm cache clean --force && npm install esbuild &&  npm install && cd ../server && npm cache clean --force && npm install esbuild && npm install  && cd ../ast_dag && npm cache clean --force && npm install esbuild && npm install && cd .."
     },
     "devDependencies": {
         "@types/js-yaml": "^4.0.9",
