@@ -15,7 +15,7 @@
     },
     "onCreateCommand": [
     ],
-    "postCreateCommand": "make 2>&1 | tee /tmp/make_build.log && make install SHELL='/bin/bash -x' 2>&1 | tee /tmp/make_install.log",
+    "postCreateCommand": "make && make install",
     "portsAttributes": {
         "2159": {
             "label": "gdb"
