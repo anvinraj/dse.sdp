@@ -8,6 +8,8 @@ default: build
 build:
 	mkdir -p out/bin
 	mkdir -p bin/graph/yaml
+	npm cache clean --force
+	npm install esbuild
 	npm install
 	vsce package --out ./out/bin/dse.vsix
 
