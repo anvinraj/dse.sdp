@@ -15,6 +15,8 @@ EXTENSION_NAME := dse.dse-1.0.0
 .PHONY: install
 install: build
 #	code --install-extension ./out/bin/dse.vsix
+	rm -rf /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME)
+	rm -rf /home/codespace/.vscode-remote/extensions/temp
 	mkdir -p /home/codespace/.vscode-remote/extensions/temp
 	unzip -q ./out/bin/dse.vsix "extension/*" -d /home/codespace/.vscode-remote/extensions/temp
 	mkdir -p /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME)
