@@ -21,7 +21,6 @@ default: build
 
 .PHONY: build
 build:
-	npm install esbuild
 	npm install
 
 
