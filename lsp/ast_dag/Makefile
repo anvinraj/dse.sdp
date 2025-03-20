@@ -6,6 +6,7 @@ default: install
 
 .PHONY: install
 install:
+	npm cache clean --force
 	npm install
 
 
