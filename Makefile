@@ -7,6 +7,7 @@ export DSE_MODELC_URL ?= https://github.com/boschglobal/dse.modelc/releases/down
 
 
 SUBDIRS = ast graph dsl lsp 
+LSPSUBDIRS = client server ast_dag 
 
 
 default: build
@@ -35,16 +36,43 @@ test:
 
 .PHONY: install
 install:
-	@for d in $(SUBDIRS); do ($(MAKE) -C $$d install ); done
+	@for d in $(SUBDIRS); do \
+		if [ "$$d" = "lsp" ]; then \
+			for sub in $(LSPSUBDIRS); do \
+				$(MAKE) -C lsp/$$sub install; \
+			done; \
+			$(MAKE) -C lsp install; \
+		else \
+			$(MAKE) -C $$d install; \
+		fi \
+	done
 
 
 .PHONY: clean
 clean:
-	@for d in $(SUBDIRS); do ($(MAKE) -C $$d clean ); done
+	@for d in $(SUBDIRS); do \
+		if [ "$$d" = "lsp" ]; then \
+			for sub in $(LSPSUBDIRS); do \
+				$(MAKE) -C lsp/$$sub clean; \
+			done; \
+			$(MAKE) -C lsp clean; \
+		else \
+			$(MAKE) -C $$d clean; \
+		fi \
+	done
 	rm -rf out
 
 
 .PHONY: cleanall
 cleanall: clean
-	@for d in $(SUBDIRS); do ($(MAKE) -C $$d cleanall ); done
+	@for d in $(SUBDIRS); do \
+		if [ "$$d" = "lsp" ]; then \
+			for sub in $(LSPSUBDIRS); do \
+				$(MAKE) -C lsp/$$sub cleanall; \
+			done; \
+			$(MAKE) -C lsp cleanall; \
+		else \
+			$(MAKE) -C $$d cleanall; \
+		fi \
+	done
 	rm -rf build
