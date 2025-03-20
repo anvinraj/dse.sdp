@@ -39,14 +39,14 @@ const execPromise = util.promisify(exec);
 let panel: vscode.WebviewPanel;
 let terminal: vscode.Terminal | undefined;
 let tmpterminal: vscode.Terminal | undefined;
-const supportedExtensions = new Set<string>(['.fsil', '.fs', '.dse']);
+const supportedExtensions = new Set<string>(['.dse']);
 const isCodespace = vscode.env.remoteName === "codespaces";
 export function activate(context: vscode.ExtensionContext) {
     let activeEditor = vscode.window.activeTextEditor;
-    const extPath = vscode.extensions.getExtension('dse.fsil')!.extensionPath;
+    const extPath = vscode.extensions.getExtension('dse.dse')!.extensionPath;
     const switchPanel = async (isSideBySide: boolean) => {
         activeEditor = vscode.window.activeTextEditor;
-        if (activeEditor && activeEditor.document.languageId === 'fsil') {
+        if (activeEditor && activeEditor.document.languageId === 'dse') {
             const filePath = activeEditor.document.uri.fsPath;
             let convStatus = await dslToAstConvertion(filePath, extPath);
             if (convStatus === true) {
@@ -224,7 +224,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Options to control the language client
     const clientOptions: LanguageClientOptions = {
-        documentSelector: [{ scheme: 'file', language: 'fsil' }],
+        documentSelector: [{ scheme: 'file', language: 'dse' }],
         synchronize: {
             // Notify the server about file changes to '.clientrc files contained in the workspace
             fileEvents: vscode.workspace.createFileSystemWatcher('**/.clientrc')
@@ -233,8 +233,8 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Create the language client and start the client.
     client = new LanguageClient(
-        'fsil',
-        'Fsil',
+        'dse',
+        'DSE',
         serverOptions,
         clientOptions
     );
