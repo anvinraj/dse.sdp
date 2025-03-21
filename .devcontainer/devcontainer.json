@@ -23,5 +23,6 @@
         "6379": {
             "label": "redis"
         }
-    }
+    },
+    "forwardPorts": [3001]
 }
