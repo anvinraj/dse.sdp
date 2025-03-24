@@ -22,7 +22,6 @@ install: build
 	mkdir -p /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME)
 	mv /home/codespace/.vscode-remote/extensions/temp/extension/* /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME)/
 	rm -rf /home/codespace/.vscode-remote/extensions/temp
-	pkill -9 -f "vscode-server" || true
 	exec $SHELL
 	@exit 0
 
