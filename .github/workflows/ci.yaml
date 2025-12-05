@@ -177,9 +177,17 @@ jobs:
 
       - name: Prepare model package
         run: |
+          set -eux
+          echo "Container GITHUB_WORKSPACE = $GITHUB_WORKSPACE"
+          ls -R "$GITHUB_WORKSPACE/examples/models/build/_dist" || true
+
           mkdir -p /repo/examples/models/build/_dist
-          mv ${{ github.workspace }}/examples/models/build/_dist/Models-${{ env.PACKAGE_VERSION }}-linux-amd64.zip \
-            /repo/examples/models/build/_dist/Models-${{ env.PACKAGE_VERSION }}-linux-amd64.zip
+
+          cp "$GITHUB_WORKSPACE/examples/models/build/_dist/Models-${PACKAGE_VERSION}-linux-amd64.zip" \
+            "/repo/examples/models/build/_dist/Models-${PACKAGE_VERSION}-linux-amd64.zip"
+
+          echo "Files now in /repo/_dist:"
+          ls -l /repo/examples/models/build/_dist
 
       - name: Test
         run: |
