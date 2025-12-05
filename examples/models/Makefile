@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-export PACKAGE_VERSION ?= 0.0.2
+export PACKAGE_VERSION ?= 0.0.1
 export PACKAGE_ARCH ?= linux-amd64
 export PLATFORM_OS := $(word 1,$(subst -, ,$(PACKAGE_ARCH)))
 export PLATFORM_ARCH := $(word 2,$(subst -, ,$(PACKAGE_ARCH)))
