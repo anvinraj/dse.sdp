@@ -153,12 +153,6 @@ jobs:
           name: image_report
           path: /tmp
 
-      # - name: Load images
-      #   run: |
-      #     docker load --input /tmp/builder.tar
-      #     docker load --input /tmp/report.tar
-      #     docker image ls -a
-
       - name: Load images
         run: |
           # Load tar files and capture the generated image IDs
@@ -178,6 +172,7 @@ jobs:
       - name: Test
         run: |
           export HOST_DOCKER_WORKSPACE=${{ env.HOST_DOCKER_WORKSPACE }}
+          make examples
           make test_e2e
 
   release:
