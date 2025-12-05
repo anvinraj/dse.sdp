@@ -153,15 +153,22 @@ jobs:
           name: image_report
           path: /tmp
 
+      # - name: Load images
+      #   run: |
+      #     docker load --input /tmp/builder.tar
+      #     docker load --input /tmp/report.tar
+      #     docker image ls -a
+
       - name: Load images
         run: |
+          # Load tar files and capture the generated image IDs
           BUILDER_ID=$(docker load --input /tmp/builder.tar | awk '/Loaded image ID/ {print $4}')
           REPORT_ID=$(docker load --input /tmp/report.tar | awk '/Loaded image ID/ {print $4}')
 
-          docker tag $BUILDER_ID builder:latest
-          docker tag $REPORT_ID report:latest
+          # Tag them with GHCR names to use the same in workflow.sh
+          docker tag $BUILDER_ID ghcr.io/boschglobal/dse-builder:latest
+          docker tag $REPORT_ID ghcr.io/boschglobal/dse-report:latest
 
-          echo "Loaded and tagged images:"
           docker image ls -a
 
       - name: Set environment
