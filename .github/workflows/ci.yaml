@@ -60,14 +60,6 @@ jobs:
           path: |
             examples/models/build/_dist/Models-${{ env.PACKAGE_VERSION }}-${{ matrix.package_arch }}.zip
           retention-days: 1
-      
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Models-${{ matrix.package_arch }}-package
-          path: |
-            examples/models/build/_dist/Models-${{ env.PACKAGE_VERSION }}-${{ matrix.package_arch }}.zip
-          retention-days: 1
-
 
   containers:
     permissions:
