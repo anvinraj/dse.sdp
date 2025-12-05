@@ -52,6 +52,7 @@ jobs:
         env:
           PACKAGE_ARCH: ${{ matrix.package_arch }}
         run: |
+          make
           make examples
 
       - uses: actions/upload-artifact@v4
@@ -142,13 +143,16 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Build containers inside test_e2e
-        run: |
-          echo "Rebuilding containers inside test_e2e..."
-          docker build -t builder -f .devcontainer/Dockerfile-builder .
-          docker build -t report -f graph/build/package/report/Dockerfile graph/
-          docker save -o /tmp/builder.tar builder
-          docker save -o /tmp/report.tar report
+      - name: Download artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: image_builder
+          path: /tmp
+      - name: Download artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: image_report
+          path: /tmp
 
       - name: Load images
         run: |
