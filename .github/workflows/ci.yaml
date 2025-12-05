@@ -173,7 +173,7 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           name: Models-linux-amd64-package   # match matrix in build
-          path: examples/models/build/_dist/Models-${{ env.PACKAGE_VERSION }}-linux-amd64.zip-downloads
+          path: ${{ github.workspace }}/examples/models/build/_dist
 
 
       - name: Test
