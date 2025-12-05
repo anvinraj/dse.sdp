@@ -168,11 +168,16 @@ jobs:
       - name: Set environment
         run: |
           echo "HOST_DOCKER_WORKSPACE=${{ github.workspace }}" >> $GITHUB_ENV
+      
+      - name: Build
+        env:
+          PACKAGE_ARCH: ${{ matrix.package_arch }}
+        run: |
+          make examples
 
       - name: Test
         run: |
           export HOST_DOCKER_WORKSPACE=${{ env.HOST_DOCKER_WORKSPACE }}
-          make examples
           make test_e2e
 
   release:
