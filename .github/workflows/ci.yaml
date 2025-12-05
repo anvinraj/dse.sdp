@@ -18,7 +18,7 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_BASE_NAME: ${{ github.repository_owner }}/dse
-  PACKAGE_VERSION: 0.0.2
+  PACKAGE_VERSION: 0.0.1
 
 jobs:
   build:
