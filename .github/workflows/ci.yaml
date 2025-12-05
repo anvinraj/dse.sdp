@@ -171,7 +171,7 @@ jobs:
       
       - name: Build
         env:
-          PACKAGE_ARCH: ${{ matrix.package_arch }}
+          PACKAGE_ARCH: linux-amd64
         run: |
           make examples
 
