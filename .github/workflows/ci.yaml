@@ -162,32 +162,23 @@ jobs:
           # Tag them with GHCR names to use the same in workflow.sh
           docker tag $BUILDER_ID ghcr.io/boschglobal/dse-builder:latest
           docker tag $REPORT_ID ghcr.io/boschglobal/dse-report:latest
-
           docker image ls -a
 
-      - name: Set environment
-        run: |
-          echo "HOST_DOCKER_WORKSPACE=${{ github.workspace }}" >> $GITHUB_ENV
-      
       - name: Download build artifacts
         uses: actions/download-artifact@v5
         with:
-          name: Models-linux-amd64-package   # match matrix in build
+          name: Models-linux-amd64-package
           path: ${{ github.workspace }}/examples/models/build/_dist
 
       - name: Prepare model package
         run: |
-          set -eux
-          echo "Container GITHUB_WORKSPACE = $GITHUB_WORKSPACE"
-          ls -R "$GITHUB_WORKSPACE/examples/models/build/_dist" || true
-
           mkdir -p /repo/examples/models/build/_dist
-
           cp "$GITHUB_WORKSPACE/examples/models/build/_dist/Models-${PACKAGE_VERSION}-linux-amd64.zip" \
             "/repo/examples/models/build/_dist/Models-${PACKAGE_VERSION}-linux-amd64.zip"
 
-          echo "Files now in /repo/_dist:"
-          ls -l /repo/examples/models/build/_dist
+      - name: Set environment
+        run: |
+          echo "HOST_DOCKER_WORKSPACE=${{ github.workspace }}" >> $GITHUB_ENV
 
       - name: Test
         run: |
