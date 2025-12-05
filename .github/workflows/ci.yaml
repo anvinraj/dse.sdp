@@ -18,7 +18,7 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_BASE_NAME: ${{ github.repository_owner }}/dse
-  PACKAGE_VERSION: 0.0.2
+  PACKAGE_VERSION: 0.0.1
 
 jobs:
   build:
@@ -155,13 +155,29 @@ jobs:
 
       - name: Load images
         run: |
-          docker load --input /tmp/builder.tar
-          docker load --input /tmp/report.tar
+          BUILDER_ID=$(docker load --input /tmp/builder.tar | awk '/Loaded image ID/ {print $4}')
+          REPORT_ID=$(docker load --input /tmp/report.tar | awk '/Loaded image ID/ {print $4}')
+          docker tag $BUILDER_ID builder:test
+          docker tag $REPORT_ID report:test
           docker image ls -a
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: Models-linux-amd64-package
+          path: ${{ github.workspace }}/examples/models/build/_dist
+
+      - name: Prepare model package
+        run: |
+          mkdir -p /repo/examples/models/build/_dist
+          cp "$GITHUB_WORKSPACE/examples/models/build/_dist/Models-${PACKAGE_VERSION}-linux-amd64.zip" \
+            "/repo/examples/models/build/_dist/Models-${PACKAGE_VERSION}-linux-amd64.zip"
 
       - name: Set environment
         run: |
           echo "HOST_DOCKER_WORKSPACE=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "DSE_BUILDER_IMAGE=builder:test" >> $GITHUB_ENV
+          echo "DSE_REPORT_IMAGE=report:test" >> $GITHUB_ENV
 
       - name: Test
         run: |
