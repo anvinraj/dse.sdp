@@ -175,6 +175,11 @@ jobs:
           name: Models-linux-amd64-package   # match matrix in build
           path: ${{ github.workspace }}/examples/models/build/_dist
 
+      - name: Prepare model package
+        run: |
+          mkdir -p /repo/examples/models/build/_dist
+          mv ${{ github.workspace }}/examples/models/build/_dist/Models-${{ env.PACKAGE_VERSION }}-linux-amd64.zip \
+            /repo/examples/models/build/_dist/Models-${{ env.PACKAGE_VERSION }}-linux-amd64.zip
 
       - name: Test
         run: |
