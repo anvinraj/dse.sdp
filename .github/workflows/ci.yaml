@@ -139,44 +139,31 @@ jobs:
           - 7687:7687
     steps:
       - uses: actions/checkout@v5
-        # with:
-        #   ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Run test in dse-testscript container
-        uses: addnab/docker-run-action@v3
         with:
-          image: ghcr.io/boschglobal/dse-testscript:latest
-          options: |
-            -v /var/run/docker.sock:/var/run/docker.sock
-          run: |
-            export HOST_DOCKER_WORKSPACE=${{ env.HOST_DOCKER_WORKSPACE }}
-            make test_e2e
+          ref: ${{ github.event.pull_request.head.sha }}
 
-      # - name: Download artifact
-      #   uses: actions/download-artifact@v5
-      #   with:
-      #     name: image_builder
-      #     path: /tmp
-      # - name: Download artifact
-      #   uses: actions/download-artifact@v5
-      #   with:
-      #     name: image_report
-      #     path: /tmp
+      - name: Build containers inside test_e2e
+        run: |
+          echo "Rebuilding containers inside test_e2e..."
+          docker build -t builder -f .devcontainer/Dockerfile-builder .
+          docker build -t report -f graph/build/package/report/Dockerfile graph/
+          docker save -o /tmp/builder.tar builder
+          docker save -o /tmp/report.tar report
 
-      # - name: Load images
-      #   run: |
-      #     docker load --input /tmp/builder.tar
-      #     docker load --input /tmp/report.tar
-      #     docker image ls -a
+      - name: Load images
+        run: |
+          docker load --input /tmp/builder.tar
+          docker load --input /tmp/report.tar
+          docker image ls -a
 
-      # - name: Set environment
-      #   run: |
-      #     echo "HOST_DOCKER_WORKSPACE=${{ github.workspace }}" >> $GITHUB_ENV
+      - name: Set environment
+        run: |
+          echo "HOST_DOCKER_WORKSPACE=${{ github.workspace }}" >> $GITHUB_ENV
 
-      # - name: Test
-      #   run: |
-      #     export HOST_DOCKER_WORKSPACE=${{ env.HOST_DOCKER_WORKSPACE }}
-      #     make test_e2e
+      - name: Test
+        run: |
+          export HOST_DOCKER_WORKSPACE=${{ env.HOST_DOCKER_WORKSPACE }}
+          make test_e2e
 
   release:
     if: startsWith(github.ref, 'refs/tags/')
