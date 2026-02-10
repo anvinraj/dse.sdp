@@ -1,6 +1,5 @@
 # SETUP: construct working folder layout
-[if env CI]
-skip "Skipping in CI ******************************************"
+skip [env CI] "Skipping in CI ******************************************"
 exec cp $REPODIR/tests/scripts/workflow.sh $WORKDIR/workflow.sh
 exec cp -r . $WORKDIR
 cd $WORKDIR
@@ -37,4 +36,5 @@ metadata:
 spec:
   signals:
     - signal: counter
+
 
