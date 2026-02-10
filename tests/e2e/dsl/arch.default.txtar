@@ -1,6 +1,4 @@
 # SETUP: construct working folder layout
-env CI
-skip "Skipping E2E test in CI"
 exec cp $REPODIR/tests/scripts/workflow.sh $WORKDIR/workflow.sh
 exec cp -r . $WORKDIR
 cd $WORKDIR
@@ -37,6 +35,7 @@ metadata:
 spec:
   signals:
     - signal: counter
+
 
 
 
