@@ -30,6 +30,12 @@ export HOST_DOCKER_WORKSPACE ?= $(shell pwd -P)
 export TESTSCRIPT_E2E_DIR ?= tests/e2e
 export PACKAGE_VERSION ?= 0.0.1
 TESTSCRIPT_E2E_FILES = $(wildcard $(TESTSCRIPT_E2E_DIR)/*/*.txtar)
+# Add auth tests only for local runs
+ifeq ($(CI),)
+ifeq ($(CODESPACES),)
+TESTSCRIPT_E2E_FILES += $(wildcard $(TESTSCRIPT_E2E_DIR)/*/auth/*.txtar)
+endif
+endif
 
 
 default: build
@@ -105,12 +111,6 @@ do-test_testscript-e2e:
 	@set -eu; \
 	for t in $(TESTSCRIPT_E2E_FILES); do \
 		echo "Running E2E Test: $$t"; \
-		if echo "$$t" | grep -q "/_TOKEN/"; then \
-			if [ -z "$${GHE_TOKEN:-}" ] || [ -z "$${AR_TOKEN:-}" ]; then \
-				echo "[SKIP] $$t (missing GHE_TOKEN or AR_TOKEN)"; \
-				continue; \
-			fi; \
-		fi; \
 		export ENTRYWORKDIR=$$(mktemp -d) ;\
 		docker run -i --rm \
 			--network=host \
