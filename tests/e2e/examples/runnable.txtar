@@ -1,3 +1,5 @@
+env SKIP_E2E
+skip 'skip e2e in ci or codespaces as AUTH TOKEN not set'
 exec cp $REPODIR/tests/scripts/workflow.sh $WORKDIR/workflow.sh
 
 env EXAMPLE_DIR=$REPODIR/examples/runnable
