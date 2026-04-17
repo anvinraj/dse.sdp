@@ -105,9 +105,11 @@ do-test_testscript-e2e:
 	@set -eu; \
 	for t in $(TESTSCRIPT_E2E_FILES); do \
 		echo "Running E2E Test: $$t"; \
-		if [ -z "$${GHE_TOKEN:-}" ] || [ -z "$${AR_TOKEN:-}" ]; then \
-			echo "[SKIP] $$t (missing GHE_TOKEN or AR_TOKEN)"; \
-			continue; \
+		if echo "$$t" | grep -q "/_TOKEN/"; then \
+			if [ -z "$${GHE_TOKEN:-}" ] || [ -z "$${AR_TOKEN:-}" ]; then \
+				echo "[SKIP] $$t (missing GHE_TOKEN or AR_TOKEN)"; \
+				continue; \
+			fi; \
 		fi; \
 		export ENTRYWORKDIR=$$(mktemp -d) ;\
 		docker run -i --rm \
