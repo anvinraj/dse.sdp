@@ -24,7 +24,7 @@ SUBDIRS = ast graph dsl lsp doc examples/models tests/testdata/e2e
 
 ###############
 ## Test Parameters.
-export EXAMPLE_VERSION ?= 0.8.26
+export EXAMPLE_VERSION ?= 0.8.48
 export HOST_ENTRYDIR ?= $(shell pwd -P)
 export HOST_DOCKER_WORKSPACE ?= $(shell pwd -P)
 export TESTSCRIPT_E2E_DIR ?= tests/e2e
@@ -93,14 +93,6 @@ generate:
 	$(MAKE) -C doc build
 	$(MAKE) -C tests/testdata/e2e build
 
-# Auto-detect CI / Codespaces
-ifeq ($(CI),true)
-  SKIP_E2E := 1
-endif
-
-ifeq ($(CODESPACES),true)
-  SKIP_E2E := 1
-endif
 
 do-test_testscript-e2e:
 # Test debug;
@@ -113,6 +105,10 @@ do-test_testscript-e2e:
 	@set -eu; \
 	for t in $(TESTSCRIPT_E2E_FILES); do \
 		echo "Running E2E Test: $$t"; \
+		if [ -z "$$GHE_TOKEN" ] || [ -z "$$AR_TOKEN" ]; then \
+			echo "[SKIP] $$t (missing GHE_TOKEN or AR_TOKEN)"; \
+			continue; \
+		fi; \
 		export ENTRYWORKDIR=$$(mktemp -d) ;\
 		docker run -i --rm \
 			--network=host \
@@ -138,7 +134,6 @@ do-test_testscript-e2e:
 				-e AR_TOKEN=$(AR_TOKEN) \
 				-e PACKAGE_VERSION=$(PACKAGE_VERSION) \
 				-e RELEASE_VERSION=$(EXAMPLE_VERSION) \
-				-e SKIP_E2E=$(SKIP_E2E) \
 				$$t; \
 	done
 
