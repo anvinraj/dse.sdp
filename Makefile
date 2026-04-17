@@ -93,6 +93,14 @@ generate:
 	$(MAKE) -C doc build
 	$(MAKE) -C tests/testdata/e2e build
 
+# Auto-detect CI / Codespaces
+ifeq ($(CI),true)
+  SKIP_E2E := 1
+endif
+
+ifeq ($(CODESPACES),true)
+  SKIP_E2E := 1
+endif
 
 do-test_testscript-e2e:
 # Test debug;
@@ -130,6 +138,7 @@ do-test_testscript-e2e:
 				-e AR_TOKEN=$(AR_TOKEN) \
 				-e PACKAGE_VERSION=$(PACKAGE_VERSION) \
 				-e RELEASE_VERSION=$(EXAMPLE_VERSION) \
+				-e SKIP_E2E=$(SKIP_E2E) \
 				$$t; \
 	done
 
