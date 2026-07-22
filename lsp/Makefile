@@ -28,13 +28,13 @@ package-extension:
 install: package-extension
 	@if [ "$(CODESPACES)" = "true" ]; then \
 		echo "Installing extension in Codespaces..."; \
-		rm -rf /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME); \
-		rm -rf /home/codespace/.vscode-remote/extensions/temp; \
-		mkdir -p /home/codespace/.vscode-remote/extensions/temp; \
-		unzip -q ./out/bin/dse.vsix "extension/*" -d /home/codespace/.vscode-remote/extensions/temp; \
-		mkdir -p /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME); \
-		mv /home/codespace/.vscode-remote/extensions/temp/extension/* /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME)/; \
-		rm -rf /home/codespace/.vscode-remote/extensions/temp; \
+		rm -rf /home/vscode/.vscode-remote/extensions/$(EXTENSION_NAME); \
+		rm -rf /home/vscode/.vscode-remote/extensions/temp; \
+		mkdir -p /home/vscode/.vscode-remote/extensions/temp; \
+		unzip -q ./out/bin/dse.vsix "extension/*" -d /home/vscode/.vscode-remote/extensions/temp; \
+		mkdir -p /home/vscode/.vscode-remote/extensions/$(EXTENSION_NAME); \
+		mv /home/vscode/.vscode-remote/extensions/temp/extension/* /home/vscode/.vscode-remote/extensions/$(EXTENSION_NAME)/; \
+		rm -rf /home/vscode/.vscode-remote/extensions/temp; \
 	else \
 		echo "Installing extension locally(WSL vscode)..."; \
 		code --install-extension ./out/bin/dse.vsix --force; \
