@@ -25,7 +25,7 @@ package-extension:
 	vsce package --out ./out/bin/dse.vsix
 
 .PHONY: install
-install:
+install: package-extension
 	@if [ "$(CODESPACES)" = "true" ]; then \
 		echo "Installing extension in Codespaces..."; \
 		rm -rf /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME); \
