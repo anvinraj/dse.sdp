@@ -14,22 +14,40 @@ build:
 	ln -sf $(SCRIPTS_DIR)/dse-mdf2csv.sh ~/.local/bin/dse-mdf2csv
 	npm install
 
-EXTENSION_NAME := dse.dse-1.0.0
-.PHONY: install
-install: build
-	@if [ "$(CODESPACES)" = "true" ]; then \
-		rm -rf /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME);	\
-		rm -rf /home/codespace/.vscode-remote/extensions/temp;	\
-		mkdir -p /home/codespace/.vscode-remote/extensions/temp;	\
-		unzip -q ./out/bin/dse.vsix "extension/*" -d /home/codespace/.vscode-remote/extensions/temp;	\
-		mkdir -p /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME);	\
-		mv /home/codespace/.vscode-remote/extensions/temp/extension/* /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME)/;	\
-		rm -rf /home/codespace/.vscode-remote/extensions/temp;	\
+# EXTENSION_NAME := dse.dse-1.0.0
+# .PHONY: install
+# install: build
+# 	@if [ "$(CODESPACES)" = "true" ]; then \
+# 		rm -rf /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME);	\
+# 		rm -rf /home/codespace/.vscode-remote/extensions/temp;	\
+# 		mkdir -p /home/codespace/.vscode-remote/extensions/temp;	\
+# 		unzip -q ./out/bin/dse.vsix "extension/*" -d /home/codespace/.vscode-remote/extensions/temp;	\
+# 		mkdir -p /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME);	\
+# 		mv /home/codespace/.vscode-remote/extensions/temp/extension/* /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME)/;	\
+# 		rm -rf /home/codespace/.vscode-remote/extensions/temp;	\
+# 	fi
+
+.PHONY: package-extension
+package-extension:
+	@if ! command -v vsce >/dev/null 2>&1; then \
+		echo "Installing @vscode/vsce..."; \
+		npm install -g @vscode/vsce; \
 	fi
+	vsce package --out ./out/bin/dse.vsix
+
+.PHONY: install-extension
+install-extension: package-extension
+	code --install-extension ./out/bin/dse.vsix --force
+	pip install matplotlib
 
 .PHONY: install-extension
 install-extension:
-	npm install -g @vscode/vsce
+	@if command -v vsce >/dev/null 2>&1; then \
+		echo "vsce is already installed."; \
+	else \
+		echo "Installing @vscode/vsce..."; \
+		npm install -g @vscode/vsce; \
+	fi
 	vsce package --out ./out/bin/dse.vsix
 	@echo y | code --install-extension ./out/bin/dse.vsix
 	pip install matplotlib
@@ -44,6 +62,7 @@ clean:
 	rm -rf package-lock.json
 	rm -rf client/package-lock.json
 	rm -rf server/package-lock.json
+	rm -rf bin
 
 .PHONY: cleanall
 cleanall: clean
