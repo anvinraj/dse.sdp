@@ -42,7 +42,7 @@
         "PATH": "${containerEnv:PATH}:${containerEnv:HOME}/.local/bin"
     },
     "onCreateCommand": [],
-    "postCreateCommand": "mkdir -p ~/.local/bin && pipx install --force uv && npm install -g http-server && python3 -m pip install --no-cache-dir notebook asammdf && cd ast && make && make install || true && cd ../dsl && make && make install || true && cd ../lsp && make && make install || true",
+    "postCreateCommand": "mkdir -p ~/.local/bin && pipx install --force uv && npm install -g http-server && python3 -m pip install --no-cache-dir notebook asammdf && make && make install || true && cd ../lsp && make install-extension || true",
     "forwardPorts": [3001],
     "portsAttributes": {
         "2159": {
