@@ -14,18 +14,7 @@ build:
 	ln -sf $(SCRIPTS_DIR)/dse-mdf2csv.sh ~/.local/bin/dse-mdf2csv
 	npm install
 
-# EXTENSION_NAME := dse.dse-1.0.0
-# .PHONY: install
-# install: build
-# 	@if [ "$(CODESPACES)" = "true" ]; then \
-# 		rm -rf /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME);	\
-# 		rm -rf /home/codespace/.vscode-remote/extensions/temp;	\
-# 		mkdir -p /home/codespace/.vscode-remote/extensions/temp;	\
-# 		unzip -q ./out/bin/dse.vsix "extension/*" -d /home/codespace/.vscode-remote/extensions/temp;	\
-# 		mkdir -p /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME);	\
-# 		mv /home/codespace/.vscode-remote/extensions/temp/extension/* /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME)/;	\
-# 		rm -rf /home/codespace/.vscode-remote/extensions/temp;	\
-# 	fi
+EXTENSION_NAME := dse.dse-1.0.0
 
 .PHONY: package-extension
 package-extension:
@@ -35,31 +24,25 @@ package-extension:
 	fi
 	vsce package --out ./out/bin/dse.vsix
 
-.PHONY: install-extension
-install-extension:
-	@echo "PATH=$$PATH"
-	@echo "which code:"
-	@which code || true
-	@echo "remote-cli:"
-	@ls -l /vscode/bin/*/bin/remote-cli/code || true
-	@CODE=$$(find /vscode/bin -path "*/bin/remote-cli/code" | head -n1); \
-	echo "CODE=$$CODE"; \
-	"$$CODE" --version || true; \
-	"$$CODE" --install-extension ./out/bin/dse.vsix --force
-	pip install matplotlib
+.PHONY: install
+install:
+	@if [ "$(CODESPACES)" = "true" ]; then \
+		echo "Installing extension in Codespaces..."; \
+		rm -rf /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME); \
+		rm -rf /home/codespace/.vscode-remote/extensions/temp; \
+		mkdir -p /home/codespace/.vscode-remote/extensions/temp; \
+		unzip -q ./out/bin/dse.vsix "extension/*" -d /home/codespace/.vscode-remote/extensions/temp; \
+		mkdir -p /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME); \
+		mv /home/codespace/.vscode-remote/extensions/temp/extension/* /home/codespace/.vscode-remote/extensions/$(EXTENSION_NAME)/; \
+		rm -rf /home/codespace/.vscode-remote/extensions/temp; \
+	else \
+		echo "Installing extension locally(WSL vscode)..."; \
+		code --install-extension ./out/bin/dse.vsix --force; \
+	fi
 
-# .PHONY: install-extension
-# install-extension:
-# 	@if command -v vsce >/dev/null 2>&1; then \
-# 		echo "vsce is already installed."; \
-# 	else \
-# 		echo "Installing @vscode/vsce..."; \
-# 		npm install -g @vscode/vsce; \
-# 	fi
-# 	vsce package --out ./out/bin/dse.vsix
-# 	@echo y | code --install-extension ./out/bin/dse.vsix
-# 	pip install matplotlib
-# 	@exit 0
+.PHONY: install-extension
+install-extension: package-extension install
+	pip install matplotlib
 
 .PHONY: test
 test:
