@@ -1,14 +1,14 @@
 import * as path from "path";
 import * as vscode from "vscode";
-import { readFile, watch, writeFileSync } from "fs";
+import { watch, writeFileSync } from "fs";
 import { exec } from "child_process";
+import * as http from "http";
 import {
   LanguageClient,
   LanguageClientOptions,
   ServerOptions,
   TransportKind,
 } from "vscode-languageclient/node";
-import * as util from "util";
 import * as fs from "fs";
 import { tmpdir } from "os";
 import { parse } from "./grammar/lib/parser/parsing";
@@ -36,7 +36,6 @@ const default_struct = {
 let outJson = { ...default_struct };
 const port = 3001;
 let client: LanguageClient;
-const execPromise = util.promisify(exec);
 let panel: vscode.WebviewPanel;
 let terminal: vscode.Terminal | undefined;
 let tmpterminal: vscode.Terminal | undefined;
@@ -88,7 +87,7 @@ export function activate(context: vscode.ExtensionContext) {
       const filePath = activeEditor.document.uri.fsPath;
       let convStatus = await dslToAstConvertion(filePath, extPath);
       if (convStatus === true) {
-        let status = processAndServeFile(extPath);
+        let status = await processAndServeFile(extPath);
         if (status === true) {
           panel?.dispose();
           panel = vscode.window.createWebviewPanel(
@@ -714,16 +713,31 @@ async function openFile(filePath: string) {
 
 async function dslToAstConvertion(inFilePath: string, extPath: string) {
   const astJsonOutputPath = path.join(extPath, "ast_dag", "ast.json");
-  const command = `dse-parse2ast "${inFilePath}" "${astJsonOutputPath}"`;
   try {
-    const { stdout, stderr } = await execPromise(command);
-    if (stderr) {
+    const dslContent = fs.readFileSync(inFilePath, "utf8");
+    const astOutput = parse(dslContent);
+
+    if (Array.isArray(astOutput)) {
+      const diagnostics = astOutput
+        .map((item: any) => {
+          const line = item?.range?.start?.line;
+          const message = item?.message;
+          if (typeof message === "string") {
+            if (typeof line === "number") {
+              return `line ${line + 1}: ${message}`;
+            }
+            return message;
+          }
+          return "Unknown parse error";
+        })
+        .join("; ");
       vscode.window.showErrorMessage(
-        `An error occurred while DSL convertion - ${stderr}`,
+        `An error occurred while DSL convertion - ${diagnostics}`,
       );
-      console.error(`stderr: ${stderr}`);
+      return false;
     }
-    console.log(`stdout: ${stdout}`);
+
+    fs.writeFileSync(astJsonOutputPath, JSON.stringify(astOutput), "utf8");
     return true;
   } catch (error) {
     vscode.window.showErrorMessage(
@@ -748,7 +762,40 @@ function processAndServeFile(extPath: string) {
     }
     console.log(`stdout: ${stdout}`);
   });
-  return true;
+  return waitForHttpServer();
+}
+
+function waitForHttpServer(
+  retries = 30,
+  delayMs = 250,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    const attempt = () => {
+      http
+        .get(`http://127.0.0.1:${port}/input.json`, (response) => {
+          response.resume();
+          if (response.statusCode && response.statusCode >= 200 && response.statusCode < 500) {
+            resolve(true);
+            return;
+          }
+          if (retries <= 0) {
+            resolve(false);
+            return;
+          }
+          setTimeout(() => resolve(attemptNext()), delayMs);
+        })
+        .on("error", () => {
+          if (retries <= 0) {
+            resolve(false);
+            return;
+          }
+          setTimeout(() => resolve(attemptNext()), delayMs);
+        });
+    };
+
+    const attemptNext = () => waitForHttpServer(retries - 1, delayMs);
+    attempt();
+  });
 }
 
 function generateContainerHTML(
@@ -1004,20 +1051,9 @@ function jsonFormatterD3(json_data: any): typeof default_struct {
 
 function updateD3InputFile(extPath: string): void {
   const file = path.join(extPath, "ast_dag", "ast.json");
-  readFile(file, "utf8", (err, data) => {
-    if (err) {
-      console.error("Error reading the file:", err);
-      return;
-    }
-
-    let json_data: JSON;
-    try {
-      json_data = JSON.parse(data);
-      console.log(json_data);
-    } catch (error) {
-      console.log("Error parsing JSON:", error);
-      return;
-    }
+  try {
+    const data = fs.readFileSync(file, "utf8");
+    const json_data = JSON.parse(data);
     const d3Data = jsonFormatterD3(json_data);
     d3Data.nodes.sort((a, b) => a.id - b.id);
     writeFileSync(
@@ -1025,7 +1061,9 @@ function updateD3InputFile(extPath: string): void {
       JSON.stringify(d3Data, null, 2),
       "utf8",
     );
-  });
+  } catch (error) {
+    console.error("Error preparing D3 input file:", error);
+  }
 }
 
 export function deactivate(): Thenable<void> | undefined {
