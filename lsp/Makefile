@@ -36,22 +36,30 @@ package-extension:
 	vsce package --out ./out/bin/dse.vsix
 
 .PHONY: install-extension
-install-extension: package-extension
-	code --install-extension ./out/bin/dse.vsix --force
+install-extension:
+	@echo "PATH=$$PATH"
+	@echo "which code:"
+	@which code || true
+	@echo "remote-cli:"
+	@ls -l /vscode/bin/*/bin/remote-cli/code || true
+	@CODE=$$(find /vscode/bin -path "*/bin/remote-cli/code" | head -n1); \
+	echo "CODE=$$CODE"; \
+	"$$CODE" --version || true; \
+	"$$CODE" --install-extension ./out/bin/dse.vsix --force
 	pip install matplotlib
 
-.PHONY: install-extension
-install-extension:
-	@if command -v vsce >/dev/null 2>&1; then \
-		echo "vsce is already installed."; \
-	else \
-		echo "Installing @vscode/vsce..."; \
-		npm install -g @vscode/vsce; \
-	fi
-	vsce package --out ./out/bin/dse.vsix
-	@echo y | code --install-extension ./out/bin/dse.vsix
-	pip install matplotlib
-	@exit 0
+# .PHONY: install-extension
+# install-extension:
+# 	@if command -v vsce >/dev/null 2>&1; then \
+# 		echo "vsce is already installed."; \
+# 	else \
+# 		echo "Installing @vscode/vsce..."; \
+# 		npm install -g @vscode/vsce; \
+# 	fi
+# 	vsce package --out ./out/bin/dse.vsix
+# 	@echo y | code --install-extension ./out/bin/dse.vsix
+# 	pip install matplotlib
+# 	@exit 0
 
 .PHONY: test
 test:
