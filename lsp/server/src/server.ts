@@ -56,6 +56,11 @@ let ghePat = "";
 let gheTokenPromise: Promise<void> | null = null;
 
 function ensureGheToken(): Promise<void> {
+  if (isCodespace){
+    ghePat = process.env.GHE_TOKEN || "";  // Store the env var directly
+    console.log("[INFO] ghePat:", ghePat);
+    return Promise.resolve();
+  }
   if (gheTokenPromise) {
     return gheTokenPromise;
   }
@@ -74,7 +79,7 @@ function ensureGheToken(): Promise<void> {
         const [, pat = ""] = stdout.split("__SEP__");
         ghePat = pat.trim();
 
-        console.log("ghePat:", ghePat);
+        console.log("[INFO] ghePat:", ghePat);
 
         resolve();
       }
@@ -379,7 +384,11 @@ function gen_git_raw_url(repo: { [key: string]: any }, file: string): string {
       `https://raw.githubusercontent.com/` +
       `${owner}/${repoName}/refs/tags/${version}/${file}`;
   } else if (url.hostname === "github.boschdevcloud.com") {
-    if (ghePat.trim()== "") {
+    if (isCodespace) {
+      console.log("[INFO] GHE_TOKEN is not available in Codespace, url : ", gitLink);
+      return "";
+    }
+    if (ghePat.trim() == "") {
       rawUrl = rawUrl.replace("{{.GHE_TOKEN}}", "GHE_TOKEN_NOT_SET");
       return rawUrl;
     } else {
@@ -622,7 +631,9 @@ async function fetchTaskfile(repo: { [key: string]: any }): Promise<{ statusCode
   for (const taskfileName of taskfileNames) {
     try {
       const taskfile_git_raw_url: string = gen_git_raw_url(repo, taskfileName);
-
+      if (taskfile_git_raw_url == ""){ // in codespace GHE_TOKEN is not available, returning "" for such urls (boschdevcloud)
+        continue;
+      }
       const result = await fetchGitHubRawFile(taskfile_git_raw_url);
       if (result.statusCode === 200) {
         return { ...result, fileName: taskfileName };
@@ -633,7 +644,7 @@ async function fetchTaskfile(repo: { [key: string]: any }): Promise<{ statusCode
   }
 
   // All attempts failed
-  console.log("Could not fetch any taskfile variant from remote repository, repo : ", repo);
+  console.log("Could not fetch any taskfile variant from remote repository, URL : ", repo["link"], ", TAG : ",repo["version"]);
   return null;
 }
 
@@ -653,10 +664,7 @@ function fetchGitData(uses_items: { [key: string]: any }, textDocument: TextDocu
           }
         } else if (!result) {
           // None of the taskfile variants were found
-          // Only report diagnostics if ghePat is available, otherwise skip to avoid noise
-          if (ghePat && ghePat.length > 0) {
             setDiagnostics(uses_items["repos"][repo], textDocument, diagnostics, seen, "404");
-          }
         }
       })
       .catch((error) => {
