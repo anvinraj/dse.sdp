@@ -39,6 +39,7 @@ let client: LanguageClient;
 let panel: vscode.WebviewPanel;
 let terminal: vscode.Terminal | undefined;
 let tmpterminal: vscode.Terminal | undefined;
+let httpServerProcess: any = null;
 const supportedExtensions = new Set<string>([".dse"]);
 const isCodespace = vscode.env.remoteName === "codespaces";
 let astYamlPath: string = "";
@@ -82,55 +83,81 @@ export function activate(context: vscode.ExtensionContext) {
     );
   }
   const switchPanel = async (isSideBySide: boolean) => {
-    activeEditor = vscode.window.activeTextEditor;
-    if (activeEditor && activeEditor.document.languageId === "dse") {
-      const filePath = activeEditor.document.uri.fsPath;
-      let convStatus = await dslToAstConvertion(filePath, extPath);
-      if (convStatus === true) {
-        let status = await processAndServeFile(extPath);
-        if (status === true) {
-          panel?.dispose();
-          panel = vscode.window.createWebviewPanel(
-            "livePreview",
-            "DSE Live Preview",
-            isSideBySide
-              ? vscode.ViewColumn.Beside // Open in the side-by-side panel
-              : vscode.ViewColumn.Active, // Open in a single panel
-            {
-              enableScripts: true,
-              retainContextWhenHidden: false,
-            },
-          );
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "Loading Live Preview",
+        cancellable: false,
+      },
+      async (progress) => {
+        activeEditor = vscode.window.activeTextEditor;
+        if (activeEditor && activeEditor.document.languageId === "dse") {
+          const filePath = activeEditor.document.uri.fsPath;
+          
+          progress.report({ message: "Converting DSL to AST..." });
+          let convStatus = await dslToAstConvertion(filePath, extPath);
+          
+          if (convStatus === true) {
+            progress.report({ message: "Starting HTTP server..." });
+            let status = await processAndServeFile(extPath);
+            
+            if (status === true) {
+              progress.report({ message: "Opening preview panel..." });
+              panel?.dispose();
+              panel = vscode.window.createWebviewPanel(
+                "livePreview",
+                "DSE Live Preview",
+                isSideBySide
+                  ? vscode.ViewColumn.Beside // Open in the side-by-side panel
+                  : vscode.ViewColumn.Active, // Open in a single panel
+                {
+                  enableScripts: true,
+                  retainContextWhenHidden: false,
+                },
+              );
+              
+              // Kill the server when the panel is disposed
+              panel.onDidDispose(() => {
+                console.log("[INFO] Panel closed, killing HTTP server on port " + port);
+                if (httpServerProcess) {
+                  httpServerProcess.kill();
+                  httpServerProcess = null;
+                } else {
+                  killProcess(port);
+                }
+              });
 
-          let url = "";
-          if (isCodespace) {
-            url = `https://${process.env.CODESPACE_NAME}-${port}.app.github.dev/ast.html?t=${new Date().getTime()}`;
-          } else {
-            url = `http://127.0.0.1:${port}/ast.html?t=${new Date().getTime()}`;
-          }
-          panel.webview.html = getWebviewContent(url);
-          let debounceTimer: NodeJS.Timeout;
-          const debounceDelay = 1000;
-          watch(filePath, async (eventType, filename) => {
-            if (eventType === "change") {
-              let status = await dslToAstConvertion(filePath, extPath);
-              if (status === true) {
-                updateD3InputFile(extPath);
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => {
-                  const cacheBustedUrl = `${url}?t=${new Date().getTime()}`;
-                  panel.webview.html = getWebviewContent(cacheBustedUrl);
-                  panel.webview.postMessage("refresh");
-                }, debounceDelay);
+              let url = "";
+              if (isCodespace) {
+                url = `https://${process.env.CODESPACE_NAME}-${port}.app.github.dev/ast.html?t=${new Date().getTime()}`;
+              } else {
+                url = `http://127.0.0.1:${port}/ast.html?t=${new Date().getTime()}`;
               }
+              panel.webview.html = getWebviewContent(url);
+              let debounceTimer: NodeJS.Timeout;
+              const debounceDelay = 1000;
+              watch(filePath, async (eventType, filename) => {
+                if (eventType === "change") {
+                  let status = await dslToAstConvertion(filePath, extPath);
+                  if (status === true) {
+                    updateD3InputFile(extPath);
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(() => {
+                      const cacheBustedUrl = `${url}?t=${new Date().getTime()}`;
+                      panel.webview.html = getWebviewContent(cacheBustedUrl);
+                      panel.webview.postMessage("refresh");
+                    }, debounceDelay);
+                  }
+                }
+              });
+              vscode.window.showInformationMessage(
+                `Live View created. Listening changes in file ${filePath}`,
+              );
             }
-          });
-          vscode.window.showInformationMessage(
-            `Live View created. Listening changes in file ${filePath}`,
-          );
+          }
         }
       }
-    }
+    );
   };
 
   context.subscriptions.push(
@@ -716,33 +743,9 @@ async function dslToAstConvertion(inFilePath: string, extPath: string) {
   try {
     const dslContent = fs.readFileSync(inFilePath, "utf8");
     const astOutput = parse(dslContent);
-
-    if (Array.isArray(astOutput)) {
-      const diagnostics = astOutput
-        .map((item: any) => {
-          const line = item?.range?.start?.line;
-          const message = item?.message;
-          if (typeof message === "string") {
-            if (typeof line === "number") {
-              return `line ${line + 1}: ${message}`;
-            }
-            return message;
-          }
-          return "Unknown parse error";
-        })
-        .join("; ");
-      vscode.window.showErrorMessage(
-        `An error occurred while DSL convertion - ${diagnostics}`,
-      );
-      return false;
-    }
-
     fs.writeFileSync(astJsonOutputPath, JSON.stringify(astOutput), "utf8");
     return true;
   } catch (error) {
-    vscode.window.showErrorMessage(
-      `An error occurred while DSL convertion - ${error}`,
-    );
     console.error(`exec error: ${error}`);
     return false;
   }
@@ -753,20 +756,27 @@ function processAndServeFile(extPath: string) {
   killProcess(port);
   const fileServePath = path.join(extPath, "ast_dag");
   const file_serve_command = `http-server ${fileServePath} -p ${port}`;
-  exec(file_serve_command, (error, stdout, stderr) => {
+  httpServerProcess = exec(file_serve_command, (error, stdout, stderr) => {
     if (error) {
+      console.error(`HTTP server error: ${error}`);
       return false;
     }
     if (stderr) {
+      console.error(`HTTP server stderr: ${stderr}`);
       return false;
     }
-    console.log(`stdout: ${stdout}`);
+    console.log(`HTTP server stdout: ${stdout}`);
   });
-  return waitForHttpServer();
+  // Add a small delay to ensure the server starts listening before we check
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(waitForHttpServer());
+    }, 500);
+  });
 }
 
 function waitForHttpServer(
-  retries = 30,
+  retries = 40,
   delayMs = 250,
 ): Promise<boolean> {
   return new Promise((resolve) => {
@@ -775,17 +785,20 @@ function waitForHttpServer(
         .get(`http://127.0.0.1:${port}/input.json`, (response) => {
           response.resume();
           if (response.statusCode && response.statusCode >= 200 && response.statusCode < 500) {
+            console.log("[INFO] HTTP server is ready, input.json accessible");
             resolve(true);
             return;
           }
           if (retries <= 0) {
+            console.error("[ERROR] HTTP server not ready after retries");
             resolve(false);
             return;
           }
           setTimeout(() => resolve(attemptNext()), delayMs);
         })
-        .on("error", () => {
+        .on("error", (err) => {
           if (retries <= 0) {
+            console.error(`[ERROR] Failed to connect to HTTP server: ${err.message}`);
             resolve(false);
             return;
           }
@@ -862,18 +875,67 @@ function getWebviewContent(url: string): string {
                     background-color:white;
                     overflow-x: hidden;
                 }
+                #loading {
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    text-align: center;
+                    font-family: Arial, sans-serif;
+                    z-index: 9999;
+                }
+                .spinner {
+                    border: 4px solid #f3f3f3;
+                    border-top: 4px solid #3498db;
+                    border-radius: 50%;
+                    width: 40px;
+                    height: 40px;
+                    animation: spin 1s linear infinite;
+                    margin: 0 auto 10px;
+                }
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
             </style>
         </head>
         <body>
+            <div id="loading">
+                <div class="spinner"></div>
+                <p>Loading AST visualization...</p>
+            </div>
             <iframe id="livePreviewIframe" src="${url}?t=${new Date().getTime()}"></iframe>
             <script>
                 const vscode = acquireVsCodeApi();
+                const loadingDiv = document.getElementById('loading');
+                const iframe = document.getElementById('livePreviewIframe');
+
+                function hideLoading() {
+                    if (loadingDiv) {
+                        loadingDiv.style.display = 'none';
+                    }
+                }
+
+                function showLoading() {
+                    if (loadingDiv) {
+                        loadingDiv.style.display = 'block';
+                    }
+                }
+
+                // Hide loading when iframe content loads
+                iframe.onload = function() {
+                    console.log('[INFO] Iframe loaded successfully');
+                    hideLoading();
+                };
+
+                iframe.onerror = function() {
+                    console.error('[ERROR] Iframe failed to load');
+                    loadingDiv.innerHTML = '<p style="color: red;">Failed to load preview. Please try closing and reopening the panel.</p>';
+                };
 
                 function refreshIframe() {
-                    const iframe = document.getElementById('livePreviewIframe');
-                    if (iframe) {
-                        iframe.src = "${url}?t=" + new Date().getTime(); // Force reload by appending timestamp
-                    }
+                    showLoading();
+                    iframe.src = "${url}?t=" + new Date().getTime(); // Force reload by appending timestamp
                 }
 
                 // Listen for messages from the extension
@@ -884,7 +946,6 @@ function getWebviewContent(url: string): string {
                 });
 
                 window.addEventListener('resize', function () {
-                    const iframe = document.querySelector('iframe');
                     if (iframe) {
                         iframe.style.width = window.innerWidth + 400 + 'px';
                         iframe.style.height = window.innerHeight - 40 + 'px';
@@ -892,6 +953,9 @@ function getWebviewContent(url: string): string {
                 });
 
                 window.dispatchEvent(new Event('resize'));
+                
+                // Hide loading after a timeout as fallback
+                setTimeout(hideLoading, 5000);
             </script>
 
         </body>
@@ -1068,8 +1132,18 @@ function updateD3InputFile(extPath: string): void {
 
 export function deactivate(): Thenable<void> | undefined {
   if (!client) {
+    killProcess(port);
+    if (httpServerProcess) {
+      httpServerProcess.kill();
+      httpServerProcess = null;
+    }
     return undefined;
   }
+  console.log("[INFO] Extension deactivating, killing HTTP server on port " + port);
   killProcess(port);
+  if (httpServerProcess) {
+    httpServerProcess.kill();
+    httpServerProcess = null;
+  }
   return client.stop();
 }
