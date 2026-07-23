@@ -34,7 +34,8 @@ const default_struct = {
 };
 
 let outJson = { ...default_struct };
-const port = 3001;
+let port = 3001;  // Made mutable - dynamically assigned based on availability
+const basePort = 3001;  // Starting port for search
 let client: LanguageClient;
 let panel: vscode.WebviewPanel;
 let terminal: vscode.Terminal | undefined;
@@ -751,63 +752,189 @@ async function dslToAstConvertion(inFilePath: string, extPath: string) {
   }
 }
 
-function processAndServeFile(extPath: string) {
+async function processAndServeFile(extPath: string): Promise<boolean> {
   updateD3InputFile(extPath);
-  killProcess(port);
+  
+  // Kill any existing server process
+  if (httpServerProcess) {
+    httpServerProcess.kill();
+    httpServerProcess = null;
+  }
+  
+  // Clean up lingering processes on current port
+  await killProcessOnPort(port);
+  
+  // Find an available port (with fallback to basePort)
+  const availablePort = await findAvailablePort(basePort);
+  port = availablePort;
+  console.log(`[INFO] HTTP server will use port ${port}`);
+  
   const fileServePath = path.join(extPath, "ast_dag");
-  const file_serve_command = `http-server ${fileServePath} -p ${port}`;
-  httpServerProcess = exec(file_serve_command, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`HTTP server error: ${error}`);
-      return false;
+  const file_serve_command = `http-server ${fileServePath} -p ${port} --cors`;
+  
+  return new Promise<boolean>((resolve) => {
+    try {
+      httpServerProcess = exec(file_serve_command, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`[ERROR] HTTP server failed: ${error.message}`);
+          return;
+        }
+        if (stderr && !stderr.includes("Hit CTRL-C") && !stderr.includes("Started HTTP server")) {
+          console.error(`[ERROR] HTTP server stderr: ${stderr}`);
+        }
+        if (stdout) {
+          console.log(`[INFO] HTTP server: ${stdout}`);
+        }
+      });
+      
+      // Handle process exit
+      httpServerProcess.on('exit', (code: number) => {
+        console.log(`[INFO] HTTP server process exited with code ${code}`);
+        httpServerProcess = null;
+      });
+      
+      // Delay to ensure server starts before checking
+      setTimeout(() => {
+        waitForHttpServer(port, 40, 250).then(resolve);
+      }, 500);
+    } catch (err) {
+      console.error(`[ERROR] Failed to start HTTP server: ${err}`);
+      resolve(false);
     }
-    if (stderr) {
-      console.error(`HTTP server stderr: ${stderr}`);
-      return false;
-    }
-    console.log(`HTTP server stdout: ${stdout}`);
   });
-  // Add a small delay to ensure the server starts listening before we check
+}
+
+function isPortAvailable(portNum: number): Promise<boolean> {
   return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(waitForHttpServer());
-    }, 500);
+    const server = require('net').createServer();
+    
+    server.once('error', (err: any) => {
+      if (err.code === 'EADDRINUSE') {
+        resolve(false);
+      } else {
+        resolve(false);
+      }
+    });
+    
+    server.once('listening', () => {
+      server.close();
+      resolve(true);
+    });
+    
+    server.listen(portNum, '0.0.0.0');
+  });
+}
+
+async function findAvailablePort(startPort: number, maxAttempts: number = 10): Promise<number> {
+  let currentPort = startPort;
+  
+  for (let i = 0; i < maxAttempts; i++) {
+    const available = await isPortAvailable(currentPort);
+    if (available) {
+      console.log(`[INFO] Port ${currentPort} is available`);
+      return currentPort;
+    }
+    console.log(`[INFO] Port ${currentPort} is in use, trying ${currentPort + 1}`);
+    currentPort++;
+  }
+  
+  console.warn(`[WARN] Could not find available port within ${maxAttempts} attempts, using port ${currentPort}`);
+  return currentPort;
+}
+
+async function killProcessOnPort(portNum: number): Promise<void> {
+  const isWindows = process.platform === 'win32';
+  const isLinux = process.platform === 'linux';
+  const isMac = process.platform === 'darwin';
+  
+  return new Promise((resolve) => {
+    if (isWindows) {
+      // Windows: use netstat and taskkill
+      exec(`netstat -ano | findstr :${portNum}`, (err, stdout) => {
+        if (err || !stdout) {
+          console.log(`[INFO] No process found on Windows port ${portNum}`);
+          resolve();
+          return;
+        }
+        
+        const lines = stdout.split("\n").filter(line => line.includes(`:${portNum}`));
+        if (lines.length > 0) {
+          const parts = lines[0].trim().split(/\s+/);
+          const pid = parts[parts.length - 1];
+          
+          if (pid && pid !== 'PID' && !isNaN(parseInt(pid))) {
+            console.log(`[INFO] Killing Windows process ${pid} on port ${portNum}`);
+            exec(`taskkill /PID ${pid} /F`, () => {
+              console.log(`[INFO] Process ${pid} terminated`);
+              resolve();
+            });
+            return;
+          }
+        }
+        resolve();
+      });
+    } else if (isLinux || isMac) {
+      // Linux/macOS: use lsof
+      exec(`lsof -i :${portNum} -t 2>/dev/null || true`, (err, stdout) => {
+        if (!stdout || stdout.trim() === '') {
+          console.log(`[INFO] No process found on Linux/macOS port ${portNum}`);
+          resolve();
+          return;
+        }
+        
+        const pids = stdout.trim().split('\n').filter(pid => pid && !isNaN(parseInt(pid)));
+        if (pids.length > 0) {
+          console.log(`[INFO] Killing Linux/macOS processes on port ${portNum}: ${pids.join(', ')}`);
+          const killCmd = `kill -9 ${pids.join(' ')} 2>/dev/null || true`;
+          exec(killCmd, () => {
+            console.log(`[INFO] Processes terminated`);
+            resolve();
+          });
+          return;
+        }
+        resolve();
+      });
+    } else {
+      console.log(`[WARN] Unsupported platform for port cleanup`);
+      resolve();
+    }
   });
 }
 
 function waitForHttpServer(
-  retries = 40,
-  delayMs = 250,
+  portNum: number,
+  retries: number = 40,
+  delayMs: number = 250,
 ): Promise<boolean> {
   return new Promise((resolve) => {
-    const attempt = () => {
+    const attempt = (retriesLeft: number) => {
+      const url = `http://127.0.0.1:${portNum}/input.json`;
       http
-        .get(`http://127.0.0.1:${port}/input.json`, (response) => {
+        .get(url, (response) => {
           response.resume();
           if (response.statusCode && response.statusCode >= 200 && response.statusCode < 500) {
-            console.log("[INFO] HTTP server is ready, input.json accessible");
+            console.log(`[INFO] HTTP server on port ${portNum} is ready`);
             resolve(true);
             return;
           }
-          if (retries <= 0) {
-            console.error("[ERROR] HTTP server not ready after retries");
+          if (retriesLeft <= 0) {
+            console.error(`[ERROR] HTTP server on port ${portNum} not ready after retries`);
             resolve(false);
             return;
           }
-          setTimeout(() => resolve(attemptNext()), delayMs);
+          setTimeout(() => attempt(retriesLeft - 1), delayMs);
         })
         .on("error", (err) => {
-          if (retries <= 0) {
-            console.error(`[ERROR] Failed to connect to HTTP server: ${err.message}`);
+          if (retriesLeft <= 0) {
+            console.error(`[ERROR] Failed to connect to HTTP server on port ${portNum}: ${err.message}`);
             resolve(false);
             return;
           }
-          setTimeout(() => resolve(attemptNext()), delayMs);
+          setTimeout(() => attempt(retriesLeft - 1), delayMs);
         });
     };
 
-    const attemptNext = () => waitForHttpServer(retries - 1, delayMs);
-    attempt();
+    attempt(retries);
   });
 }
 
@@ -875,67 +1002,18 @@ function getWebviewContent(url: string): string {
                     background-color:white;
                     overflow-x: hidden;
                 }
-                #loading {
-                    position: absolute;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    text-align: center;
-                    font-family: Arial, sans-serif;
-                    z-index: 9999;
-                }
-                .spinner {
-                    border: 4px solid #f3f3f3;
-                    border-top: 4px solid #3498db;
-                    border-radius: 50%;
-                    width: 40px;
-                    height: 40px;
-                    animation: spin 1s linear infinite;
-                    margin: 0 auto 10px;
-                }
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
             </style>
         </head>
         <body>
-            <div id="loading">
-                <div class="spinner"></div>
-                <p>Loading AST visualization...</p>
-            </div>
             <iframe id="livePreviewIframe" src="${url}?t=${new Date().getTime()}"></iframe>
             <script>
                 const vscode = acquireVsCodeApi();
-                const loadingDiv = document.getElementById('loading');
-                const iframe = document.getElementById('livePreviewIframe');
-
-                function hideLoading() {
-                    if (loadingDiv) {
-                        loadingDiv.style.display = 'none';
-                    }
-                }
-
-                function showLoading() {
-                    if (loadingDiv) {
-                        loadingDiv.style.display = 'block';
-                    }
-                }
-
-                // Hide loading when iframe content loads
-                iframe.onload = function() {
-                    console.log('[INFO] Iframe loaded successfully');
-                    hideLoading();
-                };
-
-                iframe.onerror = function() {
-                    console.error('[ERROR] Iframe failed to load');
-                    loadingDiv.innerHTML = '<p style="color: red;">Failed to load preview. Please try closing and reopening the panel.</p>';
-                };
 
                 function refreshIframe() {
-                    showLoading();
-                    iframe.src = "${url}?t=" + new Date().getTime(); // Force reload by appending timestamp
+                    const iframe = document.getElementById('livePreviewIframe');
+                    if (iframe) {
+                        iframe.src = "${url}?t=" + new Date().getTime(); // Force reload by appending timestamp
+                    }
                 }
 
                 // Listen for messages from the extension
@@ -946,6 +1024,7 @@ function getWebviewContent(url: string): string {
                 });
 
                 window.addEventListener('resize', function () {
+                    const iframe = document.querySelector('iframe');
                     if (iframe) {
                         iframe.style.width = window.innerWidth + 400 + 'px';
                         iframe.style.height = window.innerHeight - 40 + 'px';
@@ -953,9 +1032,6 @@ function getWebviewContent(url: string): string {
                 });
 
                 window.dispatchEvent(new Event('resize'));
-                
-                // Hide loading after a timeout as fallback
-                setTimeout(hideLoading, 5000);
             </script>
 
         </body>
@@ -963,30 +1039,11 @@ function getWebviewContent(url: string): string {
     `;
 }
 
-function killProcess(port: number) {
-  try {
-    exec(`netstat -ano | findstr :${port}`, (err, stdout, stderr) => {
-      if (err) {
-        return;
-      }
-      const lines = stdout
-        .split("\n")
-        .filter((line) => line.includes(`:${port}`));
-      if (lines.length > 0) {
-        console.log(lines[0].trim().split(/\s+/));
-        const pid = lines[0].trim().split(/\s+/).pop();
-        if (pid) {
-          exec(`taskkill /PID ${pid} /F`, (killErr, killStdout, killStderr) => {
-            if (killErr) {
-              return;
-            }
-          });
-        }
-      }
-    });
-  } catch (error) {
-    console.error(error);
-  }
+function killProcess(portNum: number) {
+  // Deprecated: Use killProcessOnPort instead
+  killProcessOnPort(portNum).catch(err => {
+    console.log(`[INFO] Could not kill process on port ${portNum}`);
+  });
 }
 
 function jsonFormatterD3(json_data: any): typeof default_struct {
@@ -1130,20 +1187,28 @@ function updateD3InputFile(extPath: string): void {
   }
 }
 
-export function deactivate(): Thenable<void> | undefined {
-  if (!client) {
-    killProcess(port);
-    if (httpServerProcess) {
-      httpServerProcess.kill();
-      httpServerProcess = null;
-    }
-    return undefined;
-  }
-  console.log("[INFO] Extension deactivating, killing HTTP server on port " + port);
-  killProcess(port);
+export async function deactivate() {
+  console.log(`[INFO] Extension deactivating, cleaning up port ${port}...`);
+  
   if (httpServerProcess) {
+    console.log(`[INFO] Killing HTTP server process...`);
     httpServerProcess.kill();
     httpServerProcess = null;
   }
-  return client.stop();
+  
+  try {
+    await killProcessOnPort(port);
+  } catch (err) {
+    console.log(`[WARN] Could not cleanup port ${port}: ${err}`);
+  }
+  
+  if (client) {
+    try {
+      await client.stop();
+    } catch (err) {
+      console.log(`[WARN] Error stopping language client: ${err}`);
+    }
+  }
+  
+  console.log(`[INFO] Extension deactivated successfully`);
 }
