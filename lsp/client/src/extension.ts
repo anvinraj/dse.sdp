@@ -542,12 +542,13 @@ function build(
 
         const dockerCmd = `docker run -it --rm \\
           -v ${workdir}:/workdir \\
+          -v /workspaces:/workspaces \\
           -v ${repoRoot}:/repo \\
           -w ${projDir} \\
           -e HOME=/workdir \\
           -e PROJDIR=${projDir} \\
           -e WORKDIR=${projDir} \\
-          -e ENTRYWORKDIR=${projDir} \\
+          -e ENTRYWORKDIR=${workdir} \\
           -e AR_USER -e AR_TOKEN -e GHE_USER -e GHE_TOKEN -e GHE_PAT \\
           -v /var/run/docker.sock:/var/run/docker.sock \\
           ${DSE_BUILDER_IMAGE} ${dseScriptName} && touch ${buildCompletionStatusFile}`;
