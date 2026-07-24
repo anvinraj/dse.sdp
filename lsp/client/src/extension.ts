@@ -488,7 +488,6 @@ function build(
   // Get git repo root and project directory (similar to Makefile)
   let repoRoot = workdir;
   let projDir = workdir;
-  terminal?.sendText(`docker pull ${DSE_BUILDER_IMAGE}`);
   if (!isCodespace) {
     // Get git repo root: git rev-parse --show-toplevel
     exec("git rev-parse --show-toplevel", { cwd: workdir }, (err, stdout) => {
@@ -543,7 +542,6 @@ function build(
 
         const dockerCmd = `docker run -it --rm \\
           -v ${workdir}:/workdir \\
-          -v /workspaces:/workspaces \\
           -v ${repoRoot}:/repo \\
           -w ${projDir} \\
           -e HOME=/workdir \\
