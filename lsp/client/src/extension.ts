@@ -232,8 +232,7 @@ export function activate(context: vscode.ExtensionContext) {
           terminal?.show();
           terminal?.sendText(`cd ${cdDirPath}`);
           tmpterminal = terminalSetup(tmpterminal);
-          astYamlPath = path.join(activeFileDirPath,'out', activeFileName + ".yaml");
-          console.log("================> astYamlPath",astYamlPath);
+          astYamlPath = path.join(activeFileDirPath, 'out', activeFileName + ".yaml");
           astYamlPath = isCodespace
             ? astYamlPath
             : convertToMntPath(astYamlPath.replace(/\\/g, "/"));
@@ -335,7 +334,6 @@ export function activate(context: vscode.ExtensionContext) {
           ? tmpPath
           : convertToMntPath(tmpPath.replace(/\\/g, "/"));
         const preRunPath = path.join(activeFileDirPath, execFile);
-        console.log("=======================> preRunPath : ",preRunPath);
         if (fs.existsSync(preRunPath)) {
           terminal?.sendText(
             `sh ${execFile} && touch ${preRunCompletionStatusFile}`,
@@ -544,7 +542,6 @@ function build(
         }
 
         const dockerCmd = `docker run -it --rm \\
-          --user $(id -u):$(id -g) \\
           -v ${workdir}:/workdir \\
           -v /workspaces:/workspaces \\
           -v ${repoRoot}:/repo \\
@@ -563,25 +560,20 @@ function build(
   }
 
   simulationYamlPath = path.join(activeFileDirPath, "out/simulation.yaml");
-  console.log("================> simulationYamlPath : ",simulationYamlPath);
 
   const startTime = Date.now();
   const interval = setInterval(() => {
     if (fs.existsSync(genSimulationPath) && fs.existsSync(genTaskfilePath) && fs.existsSync(tmpPathBuild)) {
       clearInterval(interval);
       // openFile(genSimulationPath); // makes activeFileDirPath to the out folder path
-      // removeFile(path.join(activeFileDirPath, 'out', activeFileName + ".json"));
-      console.log("================> remove file : ",path.join(activeFileDirPath, 'out', activeFileName + ".json"));
-      
+      // removeFile(path.join(activeFileDirPath, 'out', activeFileName + ".json"));      
 
       tmpterminal?.sendText(`rm -f /tmp/dse_*`);
       setVars(astJsonPath, terminal);
-      console.log("================> astJsonPath : ",astJsonPath);
 
       //if 'post_build.sh' is present in active dsl dir path it gets executed.
       const execFile = "post_build.sh";
       const postBuildPath = path.join(activeFileDirPath, execFile);
-      console.log("================> postBuildPath : ",postBuildPath);
       if (fs.existsSync(postBuildPath)) {
         waitForFile(tmpPathBuild, () => {
           console.log(`executing ${execFile}`);
@@ -663,24 +655,24 @@ function clean(all: boolean = false) {
 }
 
 function setVars(astJsonPath: string, terminal: vscode.Terminal | undefined) {
-  try{
-  const rawData = fs.readFileSync(astJsonPath, "utf-8");
-  const jsonData = JSON.parse(rawData);
+  try {
+    const rawData = fs.readFileSync(astJsonPath, "utf-8");
+    const jsonData = JSON.parse(rawData);
 
-  // setting env vars
-  jsonData.children.stacks.forEach((stack: { env_vars: any[] }) => {
-    stack.env_vars?.forEach((envVar) => {
-      const name = envVar.object.payload.env_var_name.value;
-      const value = envVar.object.payload.env_var_value.value;
-      envVars[name] = value;
-      terminal?.sendText(`export ${name}=${value}`);
+    // setting env vars
+    jsonData.children.stacks.forEach((stack: { env_vars: any[] }) => {
+      stack.env_vars?.forEach((envVar) => {
+        const name = envVar.object.payload.env_var_name.value;
+        const value = envVar.object.payload.env_var_value.value;
+        envVars[name] = value;
+        terminal?.sendText(`export ${name}=${value}`);
+      });
     });
-  });
-  stepSize = jsonData.object.payload.stepsize.value;
-  endTime = jsonData.object.payload.endtime.value;
-} catch (err) {
-      console.error(err);
-    } 
+    stepSize = jsonData.object.payload.stepsize.value;
+    endTime = jsonData.object.payload.endtime.value;
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 function getActiveFileInfo(
