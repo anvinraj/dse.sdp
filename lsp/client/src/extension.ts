@@ -547,7 +547,7 @@ function build(
           -e HOME=/workdir \\
           -e PROJDIR=${projDir} \\
           -e WORKDIR=${projDir} \\
-          -e ENTRYWORKDIR=${workdir} \\
+          -e ENTRYWORKDIR=${projDir} \\
           -e AR_USER -e AR_TOKEN -e GHE_USER -e GHE_TOKEN -e GHE_PAT \\
           -v /var/run/docker.sock:/var/run/docker.sock \\
           ${DSE_BUILDER_IMAGE} ${dseScriptName} && touch ${buildCompletionStatusFile}`;
