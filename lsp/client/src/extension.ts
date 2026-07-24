@@ -544,6 +544,7 @@ function build(
         }
 
         const dockerCmd = `docker run -it --rm \\
+          --user $(id -u):$(id -g) \\
           -v ${workdir}:/workdir \\
           -v /workspaces:/workspaces \\
           -v ${repoRoot}:/repo \\
