@@ -34,7 +34,7 @@ const default_struct = {
 };
 
 let outJson = { ...default_struct };
-let port = 3001;  // Made mutable - dynamically assigned based on availability
+let port = 3001;  // dynamically assigned based on availability
 const basePort = 3001;  // Starting port for search
 let client: LanguageClient;
 let panel: vscode.WebviewPanel;
@@ -57,9 +57,10 @@ const tmpPreRun = "pre_run_completed";
 const tmpPreClean = "pre_clean_completed";
 const tmpPreCleanall = "pre_cleanall_completed";
 const tmpSimRun = "sim_run_completed";
+const tmpBuild = "build_completed";
 
 export function activate(context: vscode.ExtensionContext) {
-  let diagnosticCollection = vscode.languages.createDiagnosticCollection("dse");
+  const diagnosticCollection = vscode.languages.createDiagnosticCollection("dse");
   diagnosticCollection.clear();
   context.subscriptions.push(diagnosticCollection);
   vscode.workspace.onDidChangeTextDocument((event) => {
@@ -94,14 +95,14 @@ export function activate(context: vscode.ExtensionContext) {
         activeEditor = vscode.window.activeTextEditor;
         if (activeEditor && activeEditor.document.languageId === "dse") {
           const filePath = activeEditor.document.uri.fsPath;
-          
+
           progress.report({ message: "Converting DSL to AST..." });
-          let convStatus = await dslToAstConvertion(filePath, extPath);
-          
+          const convStatus = await dslToAstConvertion(filePath, extPath);
+
           if (convStatus === true) {
             progress.report({ message: "Starting HTTP server..." });
-            let status = await processAndServeFile(extPath);
-            
+            const status = await processAndServeFile(extPath);
+
             if (status === true) {
               progress.report({ message: "Opening preview panel..." });
               panel?.dispose();
@@ -116,7 +117,7 @@ export function activate(context: vscode.ExtensionContext) {
                   retainContextWhenHidden: false,
                 },
               );
-              
+
               // Kill the server when the panel is disposed
               panel.onDidDispose(() => {
                 console.log("[INFO] Panel closed, killing HTTP server on port " + port);
@@ -139,7 +140,7 @@ export function activate(context: vscode.ExtensionContext) {
               const debounceDelay = 1000;
               watch(filePath, async (eventType, filename) => {
                 if (eventType === "change") {
-                  let status = await dslToAstConvertion(filePath, extPath);
+                  const status = await dslToAstConvertion(filePath, extPath);
                   if (status === true) {
                     updateD3InputFile(extPath);
                     clearTimeout(debounceTimer);
@@ -207,7 +208,7 @@ export function activate(context: vscode.ExtensionContext) {
     }),
   );
 
-  let build_cmd = vscode.commands.registerCommand("Build", () => {
+  const build_cmd = vscode.commands.registerCommand("Build", () => {
     clearTempFiles();
     terminal = terminalSetup(terminal);
     const editor = vscode.window.activeTextEditor;
@@ -217,11 +218,11 @@ export function activate(context: vscode.ExtensionContext) {
       cdDirPath = isCodespace
         ? activeFileDirPath
         : convertToMntPath(activeFileDirPath.replace(/\\/g, "/"));
-      const genSimulationPath = path.join(activeFileDirPath, "simulation.yaml");
-      const genTaskfilePath = path.join(activeFileDirPath, "Taskfile.yml");
+      const genSimulationPath = path.join(activeFileDirPath, "out/simulation.yaml");
+      const genTaskfilePath = path.join(activeFileDirPath, "out/Taskfile.yml");
       const astJsonPath = path.join(
-        activeFileDirPath,
-        activeFileName + ".ast.json",
+        activeFileDirPath, 'out',
+        activeFileName + ".json",
       );
       const astOutputPath = isCodespace
         ? astJsonPath
@@ -231,7 +232,8 @@ export function activate(context: vscode.ExtensionContext) {
           terminal?.show();
           terminal?.sendText(`cd ${cdDirPath}`);
           tmpterminal = terminalSetup(tmpterminal);
-          astYamlPath = path.join(activeFileDirPath, activeFileName + ".yaml");
+          astYamlPath = path.join(activeFileDirPath,'out', activeFileName + ".yaml");
+          console.log("================> astYamlPath",astYamlPath);
           astYamlPath = isCodespace
             ? astYamlPath
             : convertToMntPath(astYamlPath.replace(/\\/g, "/"));
@@ -290,49 +292,24 @@ export function activate(context: vscode.ExtensionContext) {
   });
   context.subscriptions.push(build_cmd);
 
-  let check_cmd = vscode.commands.registerCommand("Check", () => {
+  const check_cmd = vscode.commands.registerCommand("Check", () => {
     terminal = terminalSetup(terminal);
     if (astYamlPath != "" && simulationYamlPath != "") {
       terminal?.show();
-      simulationYamlPath = isCodespace
-        ? simulationYamlPath
-        : convertToMntPath(simulationYamlPath.replace(/\\/g, "/"));
-      const graphExecPath = isCodespace
-        ? path.join(extPath, "bin", "graph", "graph")
-        : convertToMntPath(
-            path.join(extPath, "bin", "graph", "graph").replace(/\\/g, "/"),
-          );
-      terminal?.sendText(
-        `docker stop memgraph 2>/dev/null || true && docker rm memgraph 2>/dev/null || true`,
-      ); // Ignore errors if container doesn't exist
-      terminal?.sendText(
-        `docker run -d --rm --name memgraph -p 3000:3000 -p 7444:7444 -p 7687:7687 -v mg_lib:/var/lib/memgraph memgraph/memgraph-platform`,
-      );
-      terminal?.sendText(`${graphExecPath} drop --all`);
-      let mergedYamlFile = mergeYAMLWithSeparator(
-        simulationYamlPath,
-        astYamlPath,
-      );
-      mergedYamlFile = isCodespace
-        ? mergedYamlFile
-        : convertToMntPath(mergedYamlFile.replace(/\\/g, "/"));
-      terminal?.sendText(`${graphExecPath} import ${mergedYamlFile}`);
-      terminal?.sendText(`${graphExecPath} export export.cyp`);
-      const graphReportYamlPath = isCodespace
-        ? path.join(
-            extPath,
-            "bin",
-            "graph",
-            "yaml",
-            "stack static_validation.yaml",
-          )
-        : convertToMntPath(
-            path.join(extPath, "bin", "graph", "yaml").replace(/\\/g, "/"),
-          );
-      terminal?.sendText(`cp "${graphReportYamlPath}" ./`);
-      terminal?.sendText(
-        `${graphExecPath} report -tag stack static_validation.yaml`,
-      );
+      terminal?.sendText(`cd ${cdDirPath}`);
+
+      const DSE_REPORT_IMAGE = "ghcr.io/boschglobal/dse-report:latest";
+      const simVolumePath = isCodespace
+        ? `${cdDirPath}/out/sim`
+        : `$(pwd)/out/sim`;
+
+      // Pull the latest report image
+      terminal?.sendText(`docker pull ${DSE_REPORT_IMAGE}`);
+
+      // Run docker report command
+      const reportCmd = `docker run -it --rm -v ${simVolumePath}:/sim ${DSE_REPORT_IMAGE} report /sim`;
+
+      terminal?.sendText(reportCmd);
     } else {
       vscode.window.showWarningMessage(
         `Please run the DSE build command to Generate the files required for the check command.`,
@@ -341,7 +318,7 @@ export function activate(context: vscode.ExtensionContext) {
   });
   context.subscriptions.push(check_cmd);
 
-  let run_cmd = vscode.commands.registerCommand("Run", () => {
+  const run_cmd = vscode.commands.registerCommand("Run", () => {
     clearTempFiles();
     terminal = terminalSetup(terminal);
     const editor = vscode.window.activeTextEditor;
@@ -351,18 +328,6 @@ export function activate(context: vscode.ExtensionContext) {
       if (astYamlPath != "") {
         terminal?.show();
         terminal?.sendText(`cd ${cdDirPath}`);
-
-        if (!isCodespace) {
-          terminal?.sendText(
-            `DSE_SIMER_IMAGE=ghcr.io/boschglobal/dse-simer:latest`,
-          );
-          terminal?.sendText(
-            `function dse-simer() { ( if test -d "$1"; then cd "$1" && shift; fi && docker run -it --rm -v $(pwd):/sim -p 2159:2159 -p 6379:6379 $DSE_SIMER_IMAGE "$@"; ); }`,
-          );
-          terminal?.sendText(`export -f dse-simer`);
-          terminal?.sendText(`export TASK_X_REMOTE_TASKFILES=1`);
-        }
-
         //if 'pre_run.sh' is present it gets executed first.
         const execFile = "pre_run.sh";
         const tmpPath: string = path.join(tmpdir(), tmpPreRun);
@@ -370,6 +335,7 @@ export function activate(context: vscode.ExtensionContext) {
           ? tmpPath
           : convertToMntPath(tmpPath.replace(/\\/g, "/"));
         const preRunPath = path.join(activeFileDirPath, execFile);
+        console.log("=======================> preRunPath : ",preRunPath);
         if (fs.existsSync(preRunPath)) {
           terminal?.sendText(
             `sh ${execFile} && touch ${preRunCompletionStatusFile}`,
@@ -391,7 +357,7 @@ export function activate(context: vscode.ExtensionContext) {
   });
   context.subscriptions.push(run_cmd);
 
-  let clean_cmd = vscode.commands.registerCommand("Clean", () => {
+  const clean_cmd = vscode.commands.registerCommand("Clean", () => {
     clearTempFiles();
     terminal = terminalSetup(terminal);
     terminal?.show();
@@ -416,7 +382,7 @@ export function activate(context: vscode.ExtensionContext) {
   });
   context.subscriptions.push(clean_cmd);
 
-  let cleanall_cmd = vscode.commands.registerCommand("Cleanall", () => {
+  const cleanall_cmd = vscode.commands.registerCommand("Cleanall", () => {
     clearTempFiles();
     terminal = terminalSetup(terminal);
     terminal?.show();
@@ -512,46 +478,115 @@ function build(
   activeFileName: string,
   astJsonPath: string,
 ) {
-  terminal?.sendText(
-    `parse2ast ${isCodespace ? filePath : convertToMntPath(filePath.replace(/\\/g, "/"))} ${astOutputPath} && touch /tmp/dse_parsing_done`,
-  ); // executing `parse2ast` command
+  const DSE_BUILDER_IMAGE = "ghcr.io/boschglobal/dse-builder:latest";
+  const dseScriptName = path.basename(filePath);
+  const workdir = activeFileDirPath;
 
-  const astExecPath = isCodespace
-    ? path.join(extPath, "bin", "ast")
-    : convertToMntPath(path.join(extPath, "bin", "ast").replace(/\\/g, "/"));
-  terminal?.sendText(
-    `if [ -f /tmp/dse_parsing_done ]; then ${astExecPath} convert -input ${astOutputPath} -output ${astYamlPath} && touch /tmp/dse_convert_done; fi\n`,
-  );
-  terminal?.sendText(
-    `if [ -f /tmp/dse_convert_done ]; then ${astExecPath} resolve -input ${astYamlPath} -cache out/cache && touch /tmp/dse_resolve_done; fi\n`,
-  );
+  const tmpPathBuild = path.join(tmpdir(), "build_completed");
+  const buildCompletionStatusFile = isCodespace
+    ? tmpPathBuild
+    : convertToMntPath(tmpPathBuild.replace(/\\/g, "/"));
 
-  const genFilesPath = isCodespace
-    ? activeFileDirPath
-    : convertToMntPath(activeFileDirPath.replace(/\\/g, "/"));
-  const dseScriptPath = isCodespace
-    ? filePath
-    : convertToMntPath(filePath.replace(/\\/g, "/"));
-  terminal?.sendText(
-    `if [ -f /tmp/dse_resolve_done ]; then ${astExecPath} generate -input ${astYamlPath} -output ${genFilesPath} --dse-script ${dseScriptPath} --overwrite; fi\n`,
-  );
-  simulationYamlPath = path.join(activeFileDirPath, "simulation.yaml");
+  // Get git repo root and project directory (similar to Makefile)
+  let repoRoot = workdir;
+  let projDir = workdir;
+  terminal?.sendText(`docker pull ${DSE_BUILDER_IMAGE}`);
+  if (!isCodespace) {
+    // Get git repo root: git rev-parse --show-toplevel
+    exec("git rev-parse --show-toplevel", { cwd: workdir }, (err, stdout) => {
+      if (!err && stdout) {
+        repoRoot = stdout.trim();
+      }
+
+      // Get git prefix: git rev-parse --show-prefix
+      exec("git rev-parse --show-prefix", { cwd: workdir }, (prefixErr, prefixStdout) => {
+        if (!prefixErr && prefixStdout) {
+          const prefix = prefixStdout.trim();
+          projDir = `/repo/${prefix}`;
+        } else {
+          projDir = `/repo`;
+        }
+
+        // Build docker command with paths similar to Makefile
+        const workdirMnt = convertToMntPath(workdir.replace(/\\/g, "/"));
+        const repoRootMnt = convertToMntPath(repoRoot.replace(/\\/g, "/"));
+
+        const dockerCmd = `docker run -it --rm \\
+          --user $(id -u):$(id -g) \\
+          --group-add $(stat -c '%g' /var/run/docker.sock) \\
+          -v ${workdirMnt}:/workdir \\
+          -v ${repoRootMnt}:/repo \\
+          -w ${projDir} \\
+          -e HOME=/workdir \\
+          -e PROJDIR=${projDir} \\
+          -e WORKDIR=${projDir} \\
+          -e ENTRYWORKDIR=${workdirMnt} \\
+          -e AR_USER -e AR_TOKEN -e GHE_USER -e GHE_TOKEN -e GHE_PAT \\
+          -v /var/run/docker.sock:/var/run/docker.sock \\
+          ${DSE_BUILDER_IMAGE} ${dseScriptName} && touch ${buildCompletionStatusFile}`;
+
+        terminal?.sendText(dockerCmd);
+      });
+    });
+  } else {
+    // For Codespace, also calculate git paths for docker-in-docker nested containers
+    exec("git rev-parse --show-toplevel", { cwd: workdir }, (err, stdout) => {
+      if (!err && stdout) {
+        repoRoot = stdout.trim();
+      }
+
+      exec("git rev-parse --show-prefix", { cwd: workdir }, (prefixErr, prefixStdout) => {
+        if (!prefixErr && prefixStdout) {
+          const prefix = prefixStdout.trim();
+          projDir = `/repo/${prefix}`;
+        } else {
+          projDir = `/repo`;
+        }
+
+        const dockerCmd = `docker run -it --rm \\
+          -v ${workdir}:/workdir \\
+          -v /workspaces:/workspaces \\
+          -v ${repoRoot}:/repo \\
+          -w ${projDir} \\
+          -e HOME=/workdir \\
+          -e PROJDIR=${projDir} \\
+          -e WORKDIR=${projDir} \\
+          -e ENTRYWORKDIR=${workdir} \\
+          -e AR_USER -e AR_TOKEN -e GHE_USER -e GHE_TOKEN -e GHE_PAT \\
+          -v /var/run/docker.sock:/var/run/docker.sock \\
+          ${DSE_BUILDER_IMAGE} ${dseScriptName} && touch ${buildCompletionStatusFile}`;
+
+        terminal?.sendText(dockerCmd);
+      });
+    });
+  }
+
+  simulationYamlPath = path.join(activeFileDirPath, "out/simulation.yaml");
+  console.log("================> simulationYamlPath : ",simulationYamlPath);
 
   const startTime = Date.now();
   const interval = setInterval(() => {
-    if (fs.existsSync(genSimulationPath) && fs.existsSync(genTaskfilePath)) {
+    if (fs.existsSync(genSimulationPath) && fs.existsSync(genTaskfilePath) && fs.existsSync(tmpPathBuild)) {
       clearInterval(interval);
-      openFile(genSimulationPath);
-      removeFile(path.join(activeFileDirPath, activeFileName + ".json"));
+      // openFile(genSimulationPath); // makes activeFileDirPath to the out folder path
+      // removeFile(path.join(activeFileDirPath, 'out', activeFileName + ".json"));
+      console.log("================> remove file : ",path.join(activeFileDirPath, 'out', activeFileName + ".json"));
+      
+
       tmpterminal?.sendText(`rm -f /tmp/dse_*`);
       setVars(astJsonPath, terminal);
+      console.log("================> astJsonPath : ",astJsonPath);
 
       //if 'post_build.sh' is present in active dsl dir path it gets executed.
       const execFile = "post_build.sh";
       const postBuildPath = path.join(activeFileDirPath, execFile);
+      console.log("================> postBuildPath : ",postBuildPath);
       if (fs.existsSync(postBuildPath)) {
-        console.log(`executing ${execFile}`);
-        terminal?.sendText(`sh ${execFile}`);
+        waitForFile(tmpPathBuild, () => {
+          console.log(`executing ${execFile}`);
+          terminal?.sendText(`sh ${execFile}`);
+          removeFile(tmpPathBuild);
+        });
       }
     } else if (Date.now() - startTime > timeout) {
       clearInterval(interval);
@@ -560,17 +595,20 @@ function build(
 }
 
 function run(astYamlPath: string, activeFileDirPath: string) {
-  const dseScriptPath = astYamlPath.replace(/\.yaml$/, ".dse");
-  terminal?.sendText(`dse-ast generate -input ${astYamlPath} -output . --dse-script ${dseScriptPath} --overwrite`);
-  terminal?.sendText(`task -y -v`);
+  const DSE_SIMER_IMAGE = "ghcr.io/boschglobal/dse-simer:latest";
+  const simPath = isCodespace
+    ? path.join(activeFileDirPath, "out/sim")
+    : convertToMntPath(path.join(activeFileDirPath, "out/sim").replace(/\\/g, "/"));
 
   const tmpPath = path.join(tmpdir(), tmpSimRun);
   const simCompletionStatusFile = isCodespace
     ? tmpPath
     : convertToMntPath(tmpPath.replace(/\\/g, "/"));
-  terminal?.sendText(
-    `dse-simer out/sim -stepsize ${stepSize} -endtime ${endTime} && touch ${simCompletionStatusFile}`,
-  );
+  // Docker command for running simulation
+  const dockerCmd = `docker run -it --rm -v ${simPath}:/sim -e STEPSIZE=${stepSize} -e ENDTIME=${endTime} ${DSE_SIMER_IMAGE} && touch ${simCompletionStatusFile}`;
+  terminal?.sendText(`docker pull ${DSE_SIMER_IMAGE}`);
+  terminal?.sendText(dockerCmd);
+
   const execFile = "post_run.sh";
   const postRunPath = path.join(activeFileDirPath, execFile);
   if (fs.existsSync(postRunPath)) {
@@ -597,7 +635,10 @@ function clean(all: boolean = false) {
   const postCleanPath = path.join(dseDirPath, execFile);
 
   if (all === false) {
-    terminal?.sendText(`task clean && touch ${cleanCompletionStatusFile}`);
+    const cleanCmd = isCodespace
+      ? `sudo sh -c 'if [ -d out/ ]; then find out -mindepth 1 -maxdepth 1 ! -name downloads -exec rm -rf {} +; fi' && touch ${cleanCompletionStatusFile}`
+      : `if [ -d out/ ]; then find out -mindepth 1 -maxdepth 1 ! -name downloads -exec rm -rf {} +; fi && touch ${cleanCompletionStatusFile}`;
+    terminal?.sendText(cleanCmd);
     if (fs.existsSync(postCleanPath)) {
       waitForFile(tmpPathClean, () => {
         console.log(`executing ${execFile}`);
@@ -606,9 +647,10 @@ function clean(all: boolean = false) {
       });
     }
   } else {
-    terminal?.sendText(
-      `task clean && task cleanall && touch ${cleanallCompletionStatusFile}`,
-    );
+    const cleanallCmd = isCodespace
+      ? `sudo rm -rf out && touch ${cleanallCompletionStatusFile}`
+      : `rm -rf out && touch ${cleanallCompletionStatusFile}`;
+    terminal?.sendText(cleanallCmd);
     if (fs.existsSync(postCleanPath)) {
       waitForFile(tmpPathCleanall, () => {
         console.log(`executing ${execFile}`);
@@ -620,6 +662,7 @@ function clean(all: boolean = false) {
 }
 
 function setVars(astJsonPath: string, terminal: vscode.Terminal | undefined) {
+  try{
   const rawData = fs.readFileSync(astJsonPath, "utf-8");
   const jsonData = JSON.parse(rawData);
 
@@ -634,30 +677,9 @@ function setVars(astJsonPath: string, terminal: vscode.Terminal | undefined) {
   });
   stepSize = jsonData.object.payload.stepsize.value;
   endTime = jsonData.object.payload.endtime.value;
-}
-
-function mergeYAMLWithSeparator(
-  simulationYamlPath: string,
-  astYamlPath: string,
-): string {
-  simulationYamlPath = isCodespace
-    ? simulationYamlPath
-    : convertToWinPath(simulationYamlPath);
-  astYamlPath = isCodespace ? astYamlPath : convertToWinPath(astYamlPath);
-  const simulationYamlContent = fs
-    .readFileSync(simulationYamlPath, "utf8")
-    .trim();
-  const astYamlContent = fs.readFileSync(astYamlPath, "utf8").trim();
-  const mergedYaml =
-    simulationYamlContent && astYamlContent
-      ? `${simulationYamlContent}\n---\n${astYamlContent}`
-      : simulationYamlContent || astYamlContent;
-  const mergedYamlFilePath = path.join(
-    tmpdir(),
-    `merged_yaml-${Date.now()}.yaml`,
-  );
-  fs.writeFileSync(mergedYamlFilePath, mergedYaml, "utf8");
-  return mergedYamlFilePath;
+} catch (err) {
+      console.error(err);
+    } 
 }
 
 function getActiveFileInfo(
@@ -684,6 +706,7 @@ function clearTempFiles() {
     tmpPreClean,
     tmpPreCleanall,
     tmpSimRun,
+    tmpBuild,
   ];
   fileNames.forEach((file) => {
     const fullPath = path.join(tmpdir(), file);
@@ -754,24 +777,24 @@ async function dslToAstConvertion(inFilePath: string, extPath: string) {
 
 async function processAndServeFile(extPath: string): Promise<boolean> {
   updateD3InputFile(extPath);
-  
+
   // Kill any existing server process
   if (httpServerProcess) {
     httpServerProcess.kill();
     httpServerProcess = null;
   }
-  
+
   // Clean up lingering processes on current port
   await killProcessOnPort(port);
-  
+
   // Find an available port (with fallback to basePort)
   const availablePort = await findAvailablePort(basePort);
   port = availablePort;
   console.log(`[INFO] HTTP server will use port ${port}`);
-  
+
   const fileServePath = path.join(extPath, "ast_dag");
   const file_serve_command = `http-server ${fileServePath} -p ${port} --cors`;
-  
+
   return new Promise<boolean>((resolve) => {
     try {
       httpServerProcess = exec(file_serve_command, (error, stdout, stderr) => {
@@ -786,13 +809,13 @@ async function processAndServeFile(extPath: string): Promise<boolean> {
           console.log(`[INFO] HTTP server: ${stdout}`);
         }
       });
-      
+
       // Handle process exit
       httpServerProcess.on('exit', (code: number) => {
         console.log(`[INFO] HTTP server process exited with code ${code}`);
         httpServerProcess = null;
       });
-      
+
       // Delay to ensure server starts before checking
       setTimeout(() => {
         waitForHttpServer(port, 40, 250).then(resolve);
@@ -807,7 +830,7 @@ async function processAndServeFile(extPath: string): Promise<boolean> {
 function isPortAvailable(portNum: number): Promise<boolean> {
   return new Promise((resolve) => {
     const server = require('net').createServer();
-    
+
     server.once('error', (err: any) => {
       if (err.code === 'EADDRINUSE') {
         resolve(false);
@@ -815,19 +838,19 @@ function isPortAvailable(portNum: number): Promise<boolean> {
         resolve(false);
       }
     });
-    
+
     server.once('listening', () => {
       server.close();
       resolve(true);
     });
-    
+
     server.listen(portNum, '0.0.0.0');
   });
 }
 
 async function findAvailablePort(startPort: number, maxAttempts: number = 10): Promise<number> {
   let currentPort = startPort;
-  
+
   for (let i = 0; i < maxAttempts; i++) {
     const available = await isPortAvailable(currentPort);
     if (available) {
@@ -837,7 +860,7 @@ async function findAvailablePort(startPort: number, maxAttempts: number = 10): P
     console.log(`[INFO] Port ${currentPort} is in use, trying ${currentPort + 1}`);
     currentPort++;
   }
-  
+
   console.warn(`[WARN] Could not find available port within ${maxAttempts} attempts, using port ${currentPort}`);
   return currentPort;
 }
@@ -846,7 +869,7 @@ async function killProcessOnPort(portNum: number): Promise<void> {
   const isWindows = process.platform === 'win32';
   const isLinux = process.platform === 'linux';
   const isMac = process.platform === 'darwin';
-  
+
   return new Promise((resolve) => {
     if (isWindows) {
       // Windows: use netstat and taskkill
@@ -856,12 +879,12 @@ async function killProcessOnPort(portNum: number): Promise<void> {
           resolve();
           return;
         }
-        
+
         const lines = stdout.split("\n").filter(line => line.includes(`:${portNum}`));
         if (lines.length > 0) {
           const parts = lines[0].trim().split(/\s+/);
           const pid = parts[parts.length - 1];
-          
+
           if (pid && pid !== 'PID' && !isNaN(parseInt(pid))) {
             console.log(`[INFO] Killing Windows process ${pid} on port ${portNum}`);
             exec(`taskkill /PID ${pid} /F`, () => {
@@ -881,7 +904,7 @@ async function killProcessOnPort(portNum: number): Promise<void> {
           resolve();
           return;
         }
-        
+
         const pids = stdout.trim().split('\n').filter(pid => pid && !isNaN(parseInt(pid)));
         if (pids.length > 0) {
           console.log(`[INFO] Killing Linux/macOS processes on port ${portNum}: ${pids.join(', ')}`);
@@ -1054,22 +1077,22 @@ function jsonFormatterD3(json_data: any): typeof default_struct {
       outJson.links = [];
 
       let model_count = 0;
-      for (let stack of json_data.children.stacks) {
+      for (const stack of json_data.children.stacks) {
         model_count += stack.children.models.length;
       }
 
       let id = 1;
-      for (let stack of json_data.children.stacks) {
-        for (let model of stack.children.models) {
-          let node_data: Node = {
+      for (const stack of json_data.children.stacks) {
+        for (const model of stack.children.models) {
+          const node_data: Node = {
             id,
             name: model.object.payload.model_name.value,
             type: "rect",
           };
           outJson.nodes.push(node_data);
 
-          for (let channel of model.children.channels) {
-            let node_data: Node = {} as Node;
+          for (const channel of model.children.channels) {
+            const node_data: Node = {} as Node;
             if (
               !outJson.nodes.find(
                 (node) =>
@@ -1088,10 +1111,10 @@ function jsonFormatterD3(json_data: any): typeof default_struct {
         }
       }
 
-      for (let channel of json_data.children.channels) {
+      for (const channel of json_data.children.channels) {
         const channel_name = channel.object.payload.channel_name.value;
-        for (let network of channel.children.networks) {
-          let node_data: Node = {} as Node;
+        for (const network of channel.children.networks) {
+          const node_data: Node = {} as Node;
           if (
             !outJson.nodes.find(
               (node) => node.name === network.object.payload.network_name.value,
@@ -1108,18 +1131,18 @@ function jsonFormatterD3(json_data: any): typeof default_struct {
         }
       }
 
-      for (let stack of json_data.children.stacks) {
-        for (let model of stack.children.models) {
+      for (const stack of json_data.children.stacks) {
+        for (const model of stack.children.models) {
           const node_id = outJson.nodes.find(
             (node) => node.name === model.object.payload.model_name.value,
           )!.id;
 
-          for (let channel of model.children.channels) {
+          for (const channel of model.children.channels) {
             const channel_data = outJson.nodes.find(
               (node) => node.name === channel.object.payload.channel_name.value,
             );
             if (channel_data) {
-              let link_data: Link = {
+              const link_data: Link = {
                 source: node_id,
                 target: channel_data.id,
                 type: "link_to_channel",
@@ -1189,19 +1212,19 @@ function updateD3InputFile(extPath: string): void {
 
 export async function deactivate() {
   console.log(`[INFO] Extension deactivating, cleaning up port ${port}...`);
-  
+
   if (httpServerProcess) {
     console.log(`[INFO] Killing HTTP server process...`);
     httpServerProcess.kill();
     httpServerProcess = null;
   }
-  
+
   try {
     await killProcessOnPort(port);
   } catch (err) {
     console.log(`[WARN] Could not cleanup port ${port}: ${err}`);
   }
-  
+
   if (client) {
     try {
       await client.stop();
@@ -1209,6 +1232,6 @@ export async function deactivate() {
       console.log(`[WARN] Error stopping language client: ${err}`);
     }
   }
-  
+
   console.log(`[INFO] Extension deactivated successfully`);
 }
