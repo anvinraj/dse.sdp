@@ -59,6 +59,7 @@ const tmpPreCleanall = "pre_cleanall_completed";
 const tmpSimRun = "sim_run_completed";
 const tmpBuild = "build_completed";
 const daemonWorkspace = "/var/lib/docker/codespacemount/workspace";
+const DSE_DOCKER_REPO = "artifactory.boschdevcloud.com/lab000141-emthacks-docker-local";
 
 export function activate(context: vscode.ExtensionContext) {
   const diagnosticCollection = vscode.languages.createDiagnosticCollection("dse");
@@ -230,7 +231,6 @@ export function activate(context: vscode.ExtensionContext) {
         : convertToMntPath(astJsonPath.replace(/\\/g, "/"));
       if (supportedExtensions.has(activeFileExt)) {
         if (validateDiagnostics(editor, diagnosticCollection)) {
-          terminal?.show();
           terminal?.sendText(`cd ${cdDirPath}`);
           tmpterminal = terminalSetup(tmpterminal);
           astYamlPath = path.join(activeFileDirPath, 'out', activeFileName + ".yaml");
@@ -478,6 +478,7 @@ function build(
   astJsonPath: string,
 ) {
   const DSE_BUILDER_IMAGE = "ghcr.io/boschglobal/dse-builder:latest";
+  const dockerConfigDir = `\${DOCKER_CONFIG:-$HOME/.docker}`;
   const dseScriptName = path.basename(filePath);
   const workdir = activeFileDirPath;
 
@@ -491,13 +492,13 @@ function build(
   let projDir = workdir;
   if (!isCodespace) {
     // Get git repo root: git rev-parse --show-toplevel
-    exec("git rev-parse --show-toplevel", { cwd: workdir }, (err, stdout) => {
+    exec("git rev-parse --show-toplevel", { cwd: workdir }, async (err, stdout) => {
       if (!err && stdout) {
         repoRoot = stdout.trim();
       }
 
       // Get git prefix: git rev-parse --show-prefix
-      exec("git rev-parse --show-prefix", { cwd: workdir }, (prefixErr, prefixStdout) => {
+      exec("git rev-parse --show-prefix", { cwd: workdir }, async (prefixErr, prefixStdout) => {
         if (!prefixErr && prefixStdout) {
           const prefix = prefixStdout.trim();
           projDir = `/repo/${prefix}`;
@@ -508,18 +509,24 @@ function build(
         // Build docker command with paths similar to Makefile
         const workdirMnt = convertToMntPath(workdir.replace(/\\/g, "/"));
         const repoRootMnt = convertToMntPath(repoRoot.replace(/\\/g, "/"));
+        const envFilePath = await promptForEnvFilePrefix();
+        terminal?.show();
+        const envFileArg = envFilePath ? `--env-file ${convertToMntPath(envFilePath.replace(/\\/g, "/"))} \\\n          ` : "";
 
         const dockerCmd = `docker run -it --rm \\
           --user $(id -u):$(id -g) \\
           --group-add $(stat -c '%g' /var/run/docker.sock) \\
+          -v ${dockerConfigDir}:/docker-config:ro \\
           -v ${workdirMnt}:/workdir \\
           -v ${repoRootMnt}:/repo \\
           -w ${projDir} \\
+          ${envFileArg}-e DOCKER_CONFIG=/docker-config \\
           -e HOME=/workdir \\
           -e PROJDIR=${projDir} \\
           -e WORKDIR=${projDir} \\
           -e ENTRYWORKDIR=${workdirMnt} \\
           -e AR_USER -e AR_TOKEN -e GHE_USER -e GHE_TOKEN -e GHE_PAT \\
+          -e DSE_DOCKER_REPO=${DSE_DOCKER_REPO} \\
           -v /var/run/docker.sock:/var/run/docker.sock \\
           ${DSE_BUILDER_IMAGE} ${dseScriptName} && touch ${buildCompletionStatusFile}`;
 
@@ -528,12 +535,12 @@ function build(
     });
   } else {
     // For Codespace, also calculate git paths for nested Docker containers
-    exec("git rev-parse --show-toplevel", { cwd: workdir }, (err, stdout) => {
+    exec("git rev-parse --show-toplevel", { cwd: workdir }, async (err, stdout) => {
     if (!err && stdout) {
       repoRoot = stdout.trim();
     }
 
-      exec("git rev-parse --show-prefix", { cwd: workdir }, (prefixErr, prefixStdout) => {
+      exec("git rev-parse --show-prefix", { cwd: workdir }, async (prefixErr, prefixStdout) => {
         if (!prefixErr && prefixStdout) {
           const prefix = prefixStdout.trim();
           projDir = `/repo/${prefix}`;
@@ -568,24 +575,30 @@ function build(
           ${DSE_BUILDER_IMAGE} \
           -c 'stat -c "%g" /var/run/docker.sock'`;
 
-        exec(socketGidCmd, (gidErr, gidStdout) => {
+        exec(socketGidCmd, async (gidErr, gidStdout) => {
           const socketGid =
             !gidErr && gidStdout ? gidStdout.trim() : "0";
 
           console.log("Docker socket GID:", socketGid);
+          const envFilePath = await promptForEnvFilePrefix();
+          terminal?.show();
+          const envFileArg = envFilePath ? `--env-file ${convertToMntPath(envFilePath.replace(/\\/g, "/"))} \\\n            ` : "";
 
           const dockerCmd = `docker run -it --rm \\
             --user $(id -u):$(id -g) \\
             --group-add ${socketGid} \\
+            -v ${dockerConfigDir}:/docker-config:ro \\
             -v ${dockerWorkdir}:/workdir \\
             -v ${daemonWorkspace}:/workspaces \\
             -v ${dockerRepoRoot}:/repo \\
             -w ${projDir} \\
+            ${envFileArg}-e DOCKER_CONFIG=/docker-config \\
             -e HOME=/workdir \\
             -e PROJDIR=${projDir} \\
             -e WORKDIR=${projDir} \\
             -e ENTRYWORKDIR=${dockerWorkdir} \\
             -e AR_USER -e AR_TOKEN -e GHE_USER -e GHE_TOKEN -e GHE_PAT \\
+            -e DSE_DOCKER_REPO=${DSE_DOCKER_REPO} \\
             -v /var/run/docker.sock:/var/run/docker.sock \\
             ${DSE_BUILDER_IMAGE} ${dseScriptName} && touch ${buildCompletionStatusFile}`;
 
@@ -779,6 +792,100 @@ function convertToWinPath(mntPath: string): string {
   return mntPath
     .replace(/^\/mnt\/([a-z])\//, (_, drive) => `${drive.toUpperCase()}:\\`)
     .replace(/\//g, "\\");
+}
+
+async function promptForEnvFilePrefix(): Promise<string> {
+  const loadChoice = await vscode.window.showQuickPick(
+    [
+      { label: "Yes", description: "Load variables from an env file" },
+      { label: "No", description: "Continue without loading an env file" },
+    ],
+    {
+      title: "Build: Load Env File",
+      placeHolder: "Select whether to load an env file before running docker build",
+      ignoreFocusOut: true,
+    },
+  );
+
+  if (!loadChoice || loadChoice.label !== "Yes") {
+    return "";
+  }
+
+  const envCandidateGroups = await Promise.all([
+    vscode.workspace.findFiles("**/.env*", "**/node_modules/**", 200),
+  ]);
+  const envCandidatesMap = new Map<string, vscode.Uri>();
+  envCandidateGroups.flat().forEach((uri) => {
+    envCandidatesMap.set(uri.fsPath, uri);
+  });
+  const envCandidates = Array.from(envCandidatesMap.values());
+
+  const envFilePickItems: vscode.QuickPickItem[] = envCandidates.map((uri) => ({
+    label: path.basename(uri.fsPath),
+    description: uri.fsPath,
+  }));
+
+  envFilePickItems.unshift({
+    label: "$(folder-opened) Browse...",
+    description: "Pick any file from disk",
+  });
+
+  const pickedEnvFile = await vscode.window.showQuickPick(envFilePickItems, {
+    title: "Build: Select Env File",
+    placeHolder: "Choose an env file to pass into the docker build command",
+    ignoreFocusOut: true,
+  });
+
+  if (!pickedEnvFile) {
+    return "";
+  }
+
+  let envFilePath = "";
+  if (pickedEnvFile.label === "$(folder-opened) Browse...") {
+    const selection = await vscode.window.showOpenDialog({
+      canSelectMany: false,
+      canSelectFiles: true,
+      canSelectFolders: false,
+      openLabel: "Load Env File",
+      filters: {
+        "Env Files": ["env*"],
+      },
+    });
+
+    if (!selection || selection.length === 0) {
+      return "";
+    }
+
+    envFilePath = selection[0].fsPath;
+  } else {
+    envFilePath = pickedEnvFile.description ?? "";
+  }
+
+  if (!envFilePath) {
+    return "";
+  }
+
+  const confirmChoice = await vscode.window.showQuickPick(
+    [
+      { label: "Load", description: path.basename(envFilePath) },
+      { label: "Cancel", description: "Do not load env file" },
+    ],
+    {
+      title: "Build: Confirm Env File",
+      placeHolder: "Confirm env file selection",
+      ignoreFocusOut: true,
+    },
+  );
+
+  if (!confirmChoice || confirmChoice.label !== "Load") {
+    return "";
+  }
+
+  vscode.window.showInformationMessage(
+    `Using env file: ${path.basename(envFilePath)}`,
+  );
+
+  return envFilePath;
 }
 
 async function openFile(filePath: string) {
