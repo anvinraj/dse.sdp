@@ -717,6 +717,7 @@ function setVars(astJsonPath: string, terminal: vscode.Terminal | undefined) {
         terminal?.sendText(`export ${name}=${value}`);
       });
     });
+    console.log(jsonData);
     stepSize = jsonData.object.payload.stepsize.value;
     endTime = jsonData.object.payload.endtime.value;
   } catch (err) {
