@@ -1,187 +1,53 @@
-# Copyright 2024 Robert Bosch GmbH
-#
-# SPDX-License-Identifier: Apache-2.0
-
-
-################
-## DSE Projects.
-export DSE_MODELC_REPO ?= https://github.com/boschglobal/dse.modelc
-export DSE_MODELC_VERSION ?= 2.3.30
-export DSE_MODELC_PKG_URL ?= $(DSE_MODELC_REPO)/releases/download/v$(DSE_MODELC_VERSION)/ModelC-$(DSE_MODELC_VERSION)-linux-amd64.zip
-export DSE_FMI_VERSION ?= 1.2.11
-
-
-###############
-## Docker Images.
-TESTSCRIPT_IMAGE ?= ghcr.io/boschglobal/dse-testscript:latest
-DSE_SIMER_IMAGE ?= ghcr.io/boschglobal/dse-simer:$(DSE_MODELC_VERSION)
-DSE_BUILDER_IMAGE ?= ghcr.io/boschglobal/dse-builder:latest
-
-
-###############
-## Build parameters.
-SUBDIRS = doc examples/models ast graph dsl lsp 
-TESTDATA_SUBDIRS = tests/testdata/e2e
-
-
-###############
-## Test Parameters.
-export EXAMPLE_VERSION ?= 0.9.7
-export HOST_ENTRYDIR ?= $(shell pwd -P)
-export HOST_DOCKER_WORKSPACE ?= $(shell pwd -P)
-export TESTSCRIPT_E2E_DIR ?= tests/e2e
-export TESTSCRIPT_E2E_INTERNAL_DIR ?= tests/e2e_internal
-export PACKAGE_VERSION ?= 0.0.1
-TESTSCRIPT_E2E_FILES = $(wildcard $(TESTSCRIPT_E2E_DIR)/*/*.txtar)
-# Add auth tests only for local runs since auth tokens are not set in CI/codespace
-ifeq ($(CI),)
-ifeq ($(CODESPACES),)
-TESTSCRIPT_E2E_FILES += $(wildcard $(TESTSCRIPT_E2E_INTERNAL_DIR)/*/*.txtar)
-endif
-endif
-ifdef TEST
-TESTSCRIPT_E2E_FILES := $(TEST)
-endif
-
-
-default: build
-help:
-	@echo "Available targets:"
-	@echo "  build         Build all project subdirectories and copy example outputs to out/examples."
-	@echo "  docker        Build the graph image and the dse-builder test image."
-	@echo "  test          Run tests in all project subdirectories."
-	@echo "  test_e2e      Run end-to-end tests via testscript."
-	@echo "  examples      Download ModelC if needed, prepare out/examples, and build example models."
-	@echo "  generate      Build documentation and generate e2e test data."
-	@echo "  clean         Clean build artifacts in all subdirectories and remove out/."
-	@echo "  cleanall      Run clean, then also clean all subdirectories and remove build/."
-	@echo "  super-linter  Run super-linter against the repository."
-	@echo "Local development commands:"
-	@echo "  export DSE_BUILDER_IMAGE=dse-builder:test"
-	@echo "  export DSE_SIMER_IMAGE=dse-simer:test"
-	@echo "  export DSE_SIMER_IMAGE=simer:test  (alternate)"
-	@echo "  make test_e2e CI=true"
-	@echo "  make test_e2e TEST=tests/e2e/dsl/uses.file.txtar"
-
-
-.PHONY: build
-build:
-	@for d in $(SUBDIRS); do ($(MAKE) -C $$d build ); done
-
-.PHONY: docker
-docker: build
-	$(MAKE) -C graph docker
-	docker build -f .devcontainer/Dockerfile-builder --tag dse-builder:test .
-
-.PHONY: devcontainer
-devcontainer: docker
-	docker build -f .devcontainer/Dockerfile --tag dse-devcontainer:test --build-arg DSE_BUILDER_IMAGE=dse-builder:test .
-
-
-downloads:
-	mkdir -p build/downloads
-	cd build/downloads; test -s ModelC-$(DSE_MODELC_VERSION)-linux-amd64.zip || ( curl -fSLO $(DSE_MODELC_PKG_URL) && unzip -q ModelC-$(DSE_MODELC_VERSION)-linux-amd64.zip )
-
-.PHONY: examples
-examples: downloads build
-	mkdir -p out/examples
-	test -d out/examples/modelc || ( cp -R build/downloads/ModelC-$(DSE_MODELC_VERSION)-linux-amd64/examples out/examples/modelc )
-	$(MAKE) -C examples/models build
-	cp examples/models/build/_dist/* out/examples
-
-.PHONY: generate
-generate:
-	$(MAKE) -C doc build
-	$(MAKE) -C tests/testdata/e2e build
-
-.PHONY: run_graph
-run_graph:
-	$(MAKE) -C graph graph
-
-
-.PHONY: test
-test: build
-	@for d in $(SUBDIRS); do ($(MAKE) -C $$d test ); done
-
-.PHONY: test_e2e
-test_e2e: do-test_testscript-e2e
-
-.PHONY: test_data
-test_data:
-	@for d in $(TESTDATA_SUBDIRS); do ($(MAKE) -C $$d test_data ); done
-
-
-.PHONY: install
-install:
-	@for d in $(SUBDIRS); do ($(MAKE) -C $$d install ); done
-
-
-.PHONY: clean
-clean:
-	@for d in $(SUBDIRS); do ($(MAKE) -C $$d clean ); done
-	rm -rf out
-
-.PHONY: cleanall
-cleanall: clean
-	@for d in $(SUBDIRS); do ($(MAKE) -C $$d cleanall ); done
-	rm -rf build
-
-
-do-test_testscript-e2e:
-# Test debug;
-#   Additional logging: add '-v' to Testscript command (e.g. $(TESTSCRIPT_IMAGE) -v \).
-#   Retain work folder: add '-work' to Testscript command (e.g. $(TESTSCRIPT_IMAGE) -work \).	@-docker kill builder 2>/dev/null ; true
-#   To skip tests add 'skip' or 'skip message' at start of txtar file.
-	@-docker kill builder 2>/dev/null ; true
-	@-docker kill report 2>/dev/null ; true
-	@-docker kill simer 2>/dev/null ; true
-	@set -eu; \
-	for t in $(TESTSCRIPT_E2E_FILES); do \
-		echo "Running E2E Test: $$t"; \
-		export ENTRYWORKDIR=$$(mktemp -d) ;\
-		docker run -i --rm \
-			--network=host \
-			-e ENTRYHOSTDIR=$(HOST_DOCKER_WORKSPACE) \
-			-e ENTRYWORKDIR=$${ENTRYWORKDIR} \
-			-v /var/run/docker.sock:/var/run/docker.sock \
-			-v $(HOST_DOCKER_WORKSPACE):/repo \
-			-v $${ENTRYWORKDIR}:/workdir \
-			$(TESTSCRIPT_IMAGE) \
-				-e ENTRYHOSTDIR=$(HOST_DOCKER_WORKSPACE) \
-				-e ENTRYWORKDIR=$${ENTRYWORKDIR} \
-				-e REPODIR=/repo \
-				-e WORKDIR=/workdir \
-				-e DSE_BUILDER_IMAGE=$(DSE_BUILDER_IMAGE) \
-				-e DSE_REPORT_IMAGE=$(DSE_REPORT_IMAGE) \
-				-e DSE_SIMER_IMAGE=$(DSE_SIMER_IMAGE) \
-				-e http_proxy=$(http_proxy) \
-				-e https_proxy=$(https_proxy) \
-				-e GHE_USER=$(GHE_USER) \
-				-e GHE_TOKEN=$(GHE_TOKEN) \
-				-e GHE_PAT=$(GHE_PAT) \
-				-e AR_USER=$(AR_USER) \
-				-e AR_TOKEN=$(AR_TOKEN) \
-				-e PACKAGE_VERSION=$(PACKAGE_VERSION) \
-				-e RELEASE_VERSION=$(EXAMPLE_VERSION) \
-				-e DSE_MODELC_VERSION=$(DSE_MODELC_VERSION) \
-				-e DSE_FMI_VERSION=$(DSE_FMI_VERSION) \
-				$$t; \
-	done
-
-
-.PHONY: super-linter
-super-linter:
-	docker run --rm --volume $$(pwd):/tmp/lint \
-		--env RUN_LOCAL=true \
-		--env DEFAULT_BRANCH=main \
-		--env IGNORE_GITIGNORED_FILES=true \
-		--env FILTER_REGEX_EXCLUDE="(doc/content/.*|(^|/)vendor/)" \
-		--env VALIDATE_CPP=true \
-		--env VALIDATE_DOCKERFILE=true \
-		--env VALIDATE_MARKDOWN=true \
-		--env VALIDATE_YAML=true \
-		ghcr.io/super-linter/super-linter:slim-v8
-
-#		--env VALIDATE_GO=true \
-#		--env VALIDATE_TYPESCRIPT_ES=true \
-#		--env VALIDATE_TYPESCRIPT_PRETTIER=true \
+{
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "golang.go",
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "dbaeumer.vscode-eslint",
+                "esbenp.prettier-vscode",
+                "streetsidesoftware.code-spell-checker",
+                "janisdd.vscode-edit-csv",
+                "rafaelarvelo.vsplotter",
+                "ms-azuretools.vscode-docker"
+            ]
+        }
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/go:1": {
+            "version": "latest"
+        },
+        "ghcr.io/devcontainers/features/python:1": {
+            "version": "3.12",
+            "installTools": true
+        },
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "latest"
+        },
+        "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+            "version": "latest",
+            "enableNonRootDocker": true
+        }
+    },
+    "remoteUser": "vscode",
+    "runArgs": [
+        "--env-file", ".devcontainer/devcontainer.env"
+    ],
+    "remoteEnv": {},
+    "onCreateCommand": [],
+    "postCreateCommand": "mkdir -p ~/.local/bin && pipx install --force uv && npm install -g http-server && python3 -m pip install --no-cache-dir notebook asammdf && make install || true",
+    "forwardPorts": [3001],
+    "portsAttributes": {
+        "2159": {
+            "label": "gdb"
+        },
+        "6379": {
+            "label": "redis"
+        }
+    }
+}
