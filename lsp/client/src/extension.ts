@@ -46,8 +46,6 @@ const isCodespace = vscode.env.remoteName === "codespaces";
 let astYamlPath: string = "";
 let simulationYamlPath: string = "";
 let cdDirPath: string = "";
-let stepSize: string;
-let endTime: string;
 const checkInterval = 1000;
 const timeout = 30000;
 const envVars: Record<string, string> = {};
@@ -478,7 +476,9 @@ function build(
   astJsonPath: string,
 ) {
   const DSE_BUILDER_IMAGE = "ghcr.io/boschglobal/dse-builder:latest";
-  const dockerConfigDir = `\${DOCKER_CONFIG:-$HOME/.docker}`;
+  const dockerConfigDir = isCodespace
+                        ? "/var/lib/docker/codespacemount/.persistedshare/.docker"
+                        : `\${DOCKER_CONFIG:-$HOME/.docker}`;
   const dseScriptName = path.basename(filePath);
   const workdir = activeFileDirPath;
 
@@ -486,6 +486,8 @@ function build(
   const buildCompletionStatusFile = isCodespace
     ? tmpPathBuild
     : convertToMntPath(tmpPathBuild.replace(/\\/g, "/"));
+
+  const loginCmd = `echo "$AR_TOKEN" | docker login -u "$AR_USER" --password-stdin ${DSE_DOCKER_REPO}`;
 
   // Get git repo root and project directory (similar to Makefile)
   let repoRoot = workdir;
@@ -530,15 +532,18 @@ function build(
           -v /var/run/docker.sock:/var/run/docker.sock \\
           ${DSE_BUILDER_IMAGE} ${dseScriptName} && touch ${buildCompletionStatusFile}`;
 
-        terminal?.sendText(dockerCmd);
+        const cmd = dockerLoginNeeded()
+          ? `${loginCmd} && ${dockerCmd}`
+          : dockerCmd;
+        terminal?.sendText(cmd);
       });
     });
   } else {
     // For Codespace, also calculate git paths for nested Docker containers
     exec("git rev-parse --show-toplevel", { cwd: workdir }, async (err, stdout) => {
-    if (!err && stdout) {
-      repoRoot = stdout.trim();
-    }
+      if (!err && stdout) {
+        repoRoot = stdout.trim();
+      }
 
       exec("git rev-parse --show-prefix", { cwd: workdir }, async (prefixErr, prefixStdout) => {
         if (!prefixErr && prefixStdout) {
@@ -602,7 +607,10 @@ function build(
             -v /var/run/docker.sock:/var/run/docker.sock \\
             ${DSE_BUILDER_IMAGE} ${dseScriptName} && touch ${buildCompletionStatusFile}`;
 
-          terminal?.sendText(dockerCmd);
+          const cmd = dockerLoginNeeded()
+            ? `${loginCmd} && ${dockerCmd}`
+            : dockerCmd;
+          terminal?.sendText(cmd);
         });
       });
     });
@@ -639,7 +647,7 @@ function build(
 function run(astYamlPath: string, activeFileDirPath: string) {
   const DSE_SIMER_IMAGE = "ghcr.io/boschglobal/dse-simer:latest";
   const simPath = isCodespace
-    ? path.join(activeFileDirPath.replace("/workspaces",daemonWorkspace), "out/sim")
+    ? path.join(activeFileDirPath.replace("/workspaces", daemonWorkspace), "out/sim")
     : convertToMntPath(path.join(activeFileDirPath, "out/sim").replace(/\\/g, "/"));
 
   const tmpPath = path.join(tmpdir(), tmpSimRun);
@@ -647,7 +655,7 @@ function run(astYamlPath: string, activeFileDirPath: string) {
     ? tmpPath
     : convertToMntPath(tmpPath.replace(/\\/g, "/"));
   // Docker command for running simulation
-  const dockerCmd = `docker run -it --rm -v ${simPath}:/sim -e STEPSIZE=${stepSize} -e ENDTIME=${endTime} ${DSE_SIMER_IMAGE} && touch ${simCompletionStatusFile}`;
+  const dockerCmd = `docker run -it --rm -v ${simPath}:/sim ${DSE_SIMER_IMAGE} && touch ${simCompletionStatusFile}`;
   terminal?.sendText(`docker pull ${DSE_SIMER_IMAGE}`);
   terminal?.sendText(dockerCmd);
 
@@ -717,9 +725,6 @@ function setVars(astJsonPath: string, terminal: vscode.Terminal | undefined) {
         terminal?.sendText(`export ${name}=${value}`);
       });
     });
-    console.log(jsonData);
-    stepSize = jsonData.object.payload.stepsize.value;
-    endTime = jsonData.object.payload.endtime.value;
   } catch (err) {
     console.error(err);
   }
@@ -1344,6 +1349,22 @@ function updateD3InputFile(extPath: string): void {
     );
   } catch (error) {
     console.error("Error preparing D3 input file:", error);
+  }
+}
+
+function dockerLoginNeeded(): boolean {
+  try {
+    const dockerConfig = path.join(
+      process.env.DOCKER_CONFIG ??
+      path.join(process.env.HOME ?? "", ".docker"),
+      "config.json",
+    );
+
+    const config = JSON.parse(fs.readFileSync(dockerConfig, "utf8"));
+
+    return !config?.auths?.["artifactory.boschdevcloud.com"]?.auth;
+  } catch {
+    return true;
   }
 }
 
