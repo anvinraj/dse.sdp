@@ -57,7 +57,6 @@ const tmpPreCleanall = "pre_cleanall_completed";
 const tmpSimRun = "sim_run_completed";
 const tmpBuild = "build_completed";
 const daemonWorkspace = "/var/lib/docker/codespacemount/workspace";
-const DSE_DOCKER_REPO = "artifactory.boschdevcloud.com/lab000141-emthacks-docker-local";
 
 export function activate(context: vscode.ExtensionContext) {
   const diagnosticCollection = vscode.languages.createDiagnosticCollection("dse");
@@ -487,7 +486,7 @@ function build(
     ? tmpPathBuild
     : convertToMntPath(tmpPathBuild.replace(/\\/g, "/"));
 
-  const loginCmd = `echo "$AR_TOKEN" | docker login -u "$AR_USER" --password-stdin ${DSE_DOCKER_REPO}`;
+  const loginCmd = `echo "$AR_TOKEN" | docker login -u "$AR_USER" --password-stdin "$DSE_DOCKER_REPO"`;
 
   // Get git repo root and project directory (similar to Makefile)
   let repoRoot = workdir;
@@ -528,7 +527,7 @@ function build(
           -e WORKDIR=${projDir} \\
           -e ENTRYWORKDIR=${workdirMnt} \\
           -e AR_USER -e AR_TOKEN -e GHE_USER -e GHE_TOKEN -e GHE_PAT \\
-          -e DSE_DOCKER_REPO=${DSE_DOCKER_REPO} \\
+          -e DSE_DOCKER_REPO \\
           -v /var/run/docker.sock:/var/run/docker.sock \\
           ${DSE_BUILDER_IMAGE} ${dseScriptName} && touch ${buildCompletionStatusFile}`;
 
@@ -603,7 +602,7 @@ function build(
             -e WORKDIR=${projDir} \\
             -e ENTRYWORKDIR=${dockerWorkdir} \\
             -e AR_USER -e AR_TOKEN -e GHE_USER -e GHE_TOKEN -e GHE_PAT \\
-            -e DSE_DOCKER_REPO=${DSE_DOCKER_REPO} \\
+            -e DSE_DOCKER_REPO \\
             -v /var/run/docker.sock:/var/run/docker.sock \\
             ${DSE_BUILDER_IMAGE} ${dseScriptName} && touch ${buildCompletionStatusFile}`;
 
